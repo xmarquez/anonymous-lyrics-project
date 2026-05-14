@@ -1,0 +1,70 @@
+services:
+  lyrics-pipeline:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: lyrics-analysis:latest
+    container_name: lyrics-pipeline
+
+    # Mount the project directory for development
+    # This allows you to edit code locally and run it in the container
+    volumes:
+      - .:/project
+      # Mount a separate volume for renv library to avoid permission issues
+      - renv-lib:/project/renv/library
+
+    # Load environment variables from .Renviron file
+    env_file:
+      - .Renviron
+
+    # Keep container running for interactive use
+    # Comment out 'command' if you want to run the pipeline automatically
+    command: tail -f /dev/null
+
+    # Uncomment below to run the pipeline automatically on startup
+    # command: Rscript run.R
+
+    # Working directory inside container
+    working_dir: /project
+
+    # Optional: limit resources
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '4'
+    #       memory: 8G
+    #     reservations:
+    #       cpus: '2'
+    #       memory: 4G
+
+  # Optional: RStudio Server for interactive development
+  rstudio:
+    build:
+      context: .
+      dockerfile: Dockerfile.rstudio
+    image: lyrics-rstudio:latest
+    container_name: lyrics-rstudio
+    profiles:
+      - rstudio  # Only start if explicitly requested
+
+    ports:
+      - "8787:8787"
+
+    volumes:
+      - .:/home/rstudio/project
+      - renv-lib:/home/rstudio/project/renv/library
+
+    env_file:
+      - .Renviron
+
+    environment:
+      - DISABLE_AUTH=true  # For local development only!
+      # For production, use:
+      # - USER=rstudio
+      # - PASSWORD=your_secure_password
+
+    working_dir: /home/rstudio/project
+
+volumes:
+  renv-lib:
+    # Named volume for renv library to persist packages between runs

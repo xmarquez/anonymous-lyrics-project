@@ -1,0 +1,453 @@
+---
+title: "Replication of Keyword, STM, and Empath Figures"
+format: html
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+This document reproduces keyword, STM, and Empath analyses from the replication pipeline.
+
+```{r}
+library(targets)
+library(tidyverse)
+library(stm)
+library(ggridges)
+
+tar_load(hot100_genius_full)
+```
+
+# Overview
+
+This document reproduces the figures referenced in the AJPS manuscript using the current pipeline data. It mirrors the structure of the paper, with Quarto labels suitable for citation in text.
+
+Note: Figure 1 in the paper is a screenshot of a Billboard chart page and is not programmatically reproduced here.
+
+# Data Preparation
+
+```{r}
+lyrics_all <- hot100_genius_full |>
+  mutate(
+    lyrics_clean = stringr::str_to_lower(dplyr::coalesce(lyrics, "")),
+    lyrics_clean = stringr::str_replace_all(lyrics_clean, "[^[:alnum:]]", " ")
+  )
+
+lyrics_matched <- lyrics_all |>
+  filter(!is.na(lyrics), lyrics != "", !is.na(match_score), match_score < 0.3)
+```
+
+# Figure 2: Missing Lyrics by Year (Paper Figure 2)
+
+```{r}
+#| label: fig-missing-lyrics
+#| fig-cap: "Missing song lyrics in Genius, by year (paper Figure 2)."
+
+missing_by_year <- lyrics_all |>
+  group_by(year) |>
+  summarise(missing = mean(is.na(lyrics) | lyrics == ""), .groups = "drop")
+
+ggplot(missing_by_year, aes(x = year, y = missing)) +
+  geom_line() +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Year", y = "Proportion missing")
+```
+
+# Figure 3: Political Keyword Search Results (Paper Figure 3)
+
+```{r}
+#| label: fig-keyword-politics
+#| fig-cap: "Political keyword search results (paper Figure 3)."
+
+political_terms <- tibble::tribble(
+  ~label, ~pattern,
+  "Politics / Political", "\\bpolitic(s|al)\\b",
+  "War", "\\bwar(s)?\\b",
+  "Democra*", "democra",
+  "Vote / Voting", "\\bvote\\b|\\bvoting\\b"
+)
+
+political_series <- political_terms |>
+  mutate(
+    series = map(pattern, \(pat) {
+      lyrics_matched |>
+        group_by(year) |>
+        summarise(prop = mean(str_detect(lyrics_clean, pat)), .groups = "drop")
+    })
+  ) |>
+  unnest(series)
+
+ggplot(political_series, aes(x = year, y = prop)) +
+  geom_line() +
+  facet_wrap(~label, ncol = 2, scales = "free_y") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(x = "Year", y = "Proportion of songs") +
+  theme_bw()
+```
+
+# Figure 4: Country Keyword Search Results (Paper Figure 4)
+
+```{r}
+#| label: fig-keyword-war-countries
+#| fig-cap: "Country keyword search results (paper Figure 4)."
+
+war_terms <- tibble::tribble(
+  ~label, ~pattern,
+  "Korea", "\\bkorea\\b",
+  "Vietnam", "\\bvietnam\\b",
+  "Iraq", "\\biraq\\b",
+  "Afghanistan", "\\bafghan\\w*\\b"
+)
+
+war_series <- war_terms |>
+  mutate(
+    series = map(pattern, \(pat) {
+      lyrics_matched |>
+        group_by(year) |>
+        summarise(prop = mean(str_detect(lyrics_clean, pat)), .groups = "drop")
+    })
+  ) |>
+  unnest(series)
+
+ggplot(war_series, aes(x = year, y = prop)) +
+  geom_line() +
+  facet_wrap(~label, ncol = 2) +
+  scale_y_continuous(labels = scales::percent, limits = c(0, 0.01)) +
+  labs(x = "Year", y = "Proportion of songs") +
+  theme_bw()
+```
+
+# Table 1: Highest Probability Words (Paper Table 1)
+
+```{r}
+#| label: tbl-stm-topics
+#| tbl-cap: "Highest probability words from the STM topics (paper Table 1)."
+
+if ("stm_topic_labels" %in% targets::tar_meta()$name) {
+  tar_load(stm_topic_labels)
+
+  stm_prob <- stm_topic_labels$prob
+  colnames(stm_prob) <- paste0("Word ", seq_len(ncol(stm_prob)))
+
+  stm_topic_table <- as_tibble(stm_prob) |>
+    mutate(Topic = row_number()) |>
+    relocate(Topic)
+
+  knitr::kable(stm_topic_table)
+} else {
+  knitr::kable(
+    tibble::tibble(Note = "STM topic labels not available. Run STM pipeline to reproduce Table 1.")
+  )
+}
+```
+
+# Figure 5: STM Conflict and Violence Over Time (Paper Figure 5)
+
+```{r}
+#| label: fig-stm-violence
+#| fig-cap: "STM conflict and violence topics over time (paper Figure 5)."
+
+if (all(c("stm_effects", "stm_topic_labels") %in% targets::tar_meta()$name)) {
+  tar_load(stm_effects)
+  tar_load(stm_topic_labels)
+
+  violence_terms <- c("die", "fight", "kill", "dead", "gun", "blood", "war", "violence")
+  topic_words <- stm_topic_labels$prob
+  topic_scores <- apply(
+    topic_words,
+    1,
+    \(words) sum(tolower(words) %in% violence_terms)
+  )
+  violence_topic <- which.max(topic_scores)
+  if (length(violence_topic) == 0 || max(topic_scores) == 0) {
+    violence_topic <- 70
+  }
+
+  if ("stm_fit" %in% targets::tar_meta()$name) {
+    tar_load(stm_fit)
+    plot(
+      stm_effects,
+      "Year",
+      method = "continuous",
+      linecol = "black",
+      printlegend = FALSE,
+      xlab = "Year",
+      main = paste0("Conflict and Violence Topic (Topic ", violence_topic, ")"),
+      topics = violence_topic,
+      model = stm_fit
+    )
+  } else {
+    plot(
+      stm_effects,
+      "Year",
+      method = "continuous",
+      linecol = "black",
+      printlegend = FALSE,
+      xlab = "Year",
+      main = paste0("Conflict and Violence Topic (Topic ", violence_topic, ")"),
+      topics = violence_topic
+    )
+  }
+} else {
+  ggplot() +
+    annotate(
+      "text",
+      x = 0,
+      y = 0,
+      label = "STM results not available. Run the STM pipeline to reproduce this figure."
+    ) +
+    theme_void()
+}
+```
+
+# Figure 6: Empath Results Over Time (Paper Figure 6)
+
+```{r}
+#| label: fig-empath-over-time
+#| fig-cap: "Empath results over time (paper Figure 6)."
+
+if ("empath_results" %in% targets::tar_meta()$name) {
+  tar_load(empath_results)
+
+  empath_long <- bind_rows(
+    empath_results |> filter(politics > 0) |> count(year) |> mutate(category = "Politics"),
+    empath_results |> filter(politics_nytimes > 0) |> count(year) |> mutate(category = "Politics (NYTimes)"),
+    empath_results |> filter(politics_reddit > 0) |> count(year) |> mutate(category = "Politics (Reddit)"),
+    empath_results |> filter(politics_fiction > 0) |> count(year) |> mutate(category = "Politics (Fiction)")
+  )
+
+ggplot(empath_long, aes(x = year, y = n)) +
+  geom_line() +
+  facet_wrap(~category, ncol = 2, scales = "free_y") +
+  labs(x = "Year", y = "Songs with non-zero score")
+} else if (file.exists(here::here("empath", "empath_politics_freq.pdf"))) {
+  knitr::include_graphics(here::here("empath", "empath_politics_freq.pdf"))
+} else {
+  ggplot() +
+    annotate(
+      "text",
+      x = 0,
+      y = 0,
+      label = "Empath results not available. Run the Empath pipeline to reproduce this figure."
+    ) +
+    theme_void()
+}
+```
+
+# Table 2: Empath Results, Top Songs (Paper Table 2)
+
+```{r}
+#| label: tbl-empath-top-songs
+#| tbl-cap: "Empath results for top songs (paper Table 2)."
+
+if ("empath_results" %in% targets::tar_meta()$name) {
+  tar_load(empath_results)
+
+  empath_unique <- empath_results |>
+    select(
+      artist,
+      title,
+      politics,
+      politics_nytimes,
+      politics_reddit,
+      politics_fiction,
+      government,
+      independence,
+      violence,
+      military,
+      terrorism,
+      law
+    ) |>
+    group_by(artist, title) |>
+    summarise(across(where(is.numeric), ~ max(.x, na.rm = TRUE)), .groups = "drop")
+
+  top_empath <- function(column, panel) {
+    empath_unique |>
+      filter(.data[[column]] > 0) |>
+      arrange(desc(.data[[column]])) |>
+      slice_head(n = 6) |>
+      transmute(
+        Panel = panel,
+        Artist = artist,
+        Title = title,
+        Score = round(.data[[column]], 3)
+      )
+  }
+
+  empath_table_2 <- bind_rows(
+    top_empath("politics", "Panel A: Politics"),
+    top_empath("politics_nytimes", "Panel B: Politics (NY Times)"),
+    top_empath("politics_reddit", "Panel C: Politics (Reddit)"),
+    top_empath("politics_fiction", "Panel D: Politics (Fiction)")
+  )
+
+  knitr::kable(empath_table_2)
+} else {
+  knitr::kable(
+    tibble::tibble(Note = "Empath results not available. Run Empath pipeline to reproduce Table 2.")
+  )
+}
+```
+
+# Table 3: Empath Results, New Politics Measures (Paper Table 3)
+
+```{r}
+#| label: tbl-empath-top-songs-expanded
+#| tbl-cap: "Empath results for expanded politics measures (paper Table 3)."
+
+if ("empath_results" %in% targets::tar_meta()$name) {
+  tar_load(empath_results)
+
+  empath_unique <- empath_results |>
+    select(
+      artist,
+      title,
+      politics,
+      politics_nytimes,
+      politics_reddit,
+      politics_fiction,
+      government,
+      independence,
+      violence,
+      military,
+      terrorism,
+      law
+    ) |>
+    group_by(artist, title) |>
+    summarise(across(where(is.numeric), ~ max(.x, na.rm = TRUE)), .groups = "drop")
+
+  top_empath <- function(column, panel) {
+    empath_unique |>
+      filter(.data[[column]] > 0) |>
+      arrange(desc(.data[[column]])) |>
+      slice_head(n = 6) |>
+      transmute(
+        Panel = panel,
+        Artist = artist,
+        Title = title,
+        Score = round(.data[[column]], 3)
+      )
+  }
+
+  empath_table_3 <- bind_rows(
+    top_empath("government", "Panel A: Government"),
+    top_empath("independence", "Panel B: Independence"),
+    top_empath("violence", "Panel C: Violence"),
+    top_empath("military", "Panel D: Military"),
+    top_empath("terrorism", "Panel E: Terrorism"),
+    top_empath("law", "Panel F: Law")
+  )
+
+  knitr::kable(empath_table_3)
+} else {
+  knitr::kable(
+    tibble::tibble(Note = "Empath results not available. Run Empath pipeline to reproduce Table 3.")
+  )
+}
+```
+
+# Table 4: Empath Scores for Known Political Songs (Paper Table 4)
+
+```{r}
+#| label: tbl-empath-known-songs
+#| tbl-cap: "Empath scores for known political songs (paper Table 4)."
+
+if ("empath_results" %in% targets::tar_meta()$name) {
+  tar_load(empath_results)
+
+  known_politics <- readr::read_csv(
+    "data-raw/known_politics_songs.csv",
+    show_col_types = FALSE
+  )
+
+  empath_score_cols <- c(
+    "politics",
+    "politics_nytimes",
+    "politics_reddit",
+    "politics_fiction",
+    "government",
+    "independence",
+    "violence",
+    "military",
+    "terrorism",
+    "law"
+  )
+
+  normalize_join_key <- function(x) {
+    x |>
+      stringr::str_to_lower() |>
+      stringr::str_replace_all("[^[:alnum:]]+", " ") |>
+      stringr::str_squish()
+  }
+
+  summarise_empath_scores <- function(data) {
+    data |>
+      select(any_of(c("artist", "title", empath_score_cols))) |>
+      group_by(artist, title) |>
+      summarise(
+        across(
+          all_of(empath_score_cols),
+          \(x) if (all(is.na(x))) NA_real_ else max(x, na.rm = TRUE)
+        ),
+        .groups = "drop"
+      )
+  }
+
+  empath_scored_filtered <- summarise_empath_scores(empath_results) |>
+    mutate(
+      artist_key = normalize_join_key(artist),
+      title_key = normalize_join_key(title),
+      source_priority = 1L
+    )
+
+  empath_scored_raw <- readr::read_csv(
+    "empath/output/empath_using_seeds.csv",
+    show_col_types = FALSE
+  ) |>
+    select(-1) |>
+    summarise_empath_scores() |>
+    mutate(
+      artist_key = normalize_join_key(artist),
+      title_key = normalize_join_key(title),
+      source_priority = 2L
+    )
+
+  empath_scored <- bind_rows(empath_scored_filtered, empath_scored_raw) |>
+    arrange(artist_key, title_key, source_priority) |>
+    group_by(artist_key, title_key) |>
+    slice_head(n = 1) |>
+    ungroup() |>
+    select(-source_priority, -artist, -title)
+
+  known_scores <- known_politics |>
+    mutate(
+      artist_key = normalize_join_key(artist),
+      title_key = normalize_join_key(title)
+    ) |>
+    left_join(empath_scored, by = c("artist_key", "title_key")) |>
+    mutate(across(all_of(empath_score_cols), ~ tidyr::replace_na(.x, 0))) |>
+    arrange(year, artist, title) |>
+    select(
+      Artist = artist,
+      Title = title,
+      Year = year,
+      Politics = politics,
+      `Politics (NY Times)` = politics_nytimes,
+      `Politics (Reddit)` = politics_reddit,
+      `Politics (Fiction)` = politics_fiction,
+      Government = government,
+      Independence = independence,
+      Violence = violence,
+      Military = military,
+      Terrorism = terrorism,
+      Law = law
+    ) |>
+    mutate(across(where(is.numeric), ~ round(.x, 3)))
+
+  knitr::kable(known_scores)
+} else {
+  knitr::kable(
+    tibble::tibble(Note = "Empath results not available. Run Empath pipeline to reproduce Table 4.")
+  )
+}
+```

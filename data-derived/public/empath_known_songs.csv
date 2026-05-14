@@ -1,0 +1,17 @@
+artist,title,year,politics,politics_nytimes,politics_reddit,politics_fiction,government,independence,violence,military,terrorism,law
+Johnny Cash,Don't Take Your Guns To Town,1959,0,0,0,0,0,0,0.003,0,0,0
+Johnny Horton,The Battle Of New Orleans,1959,0,0,0,0,0,0,0.002,0,0,0
+Creedence Clearwater Revival,Fortunate Son,1969,0,0,0,0.005,0,0,0,0.005,0,0
+Plastic Ono Band,Give Peace A Chance,1969,0,0,0,0,0,0,0,0,0,0
+John Lennon/Plastic Ono Band,Imagine,1971,0,0,0,0.007,0,0,0.007,0,0,0
+Marvin Gaye,What's Going On,1971,0,0,0,0,0,0,0.006,0,0,0.006
+Frankie Goes To Hollywood,Two Tribes,1984,0,0,0,0.037,0,0,0.005,0,0,0
+Bruce Springsteen,Born In The U.S.A.,1985,0,0,0,0,0,0,0.018,0,0,0
+Scorpions,Wind Of Change,1991,0,0,0,0,0,0,0.003,0,0,0
+Arrested Development,Mr. Wendal,1993,0.003,0,0,0,0.007,0.003,0,0,0,0.007
+The Black Eyed Peas,Where Is The Love?,2003,0,0,0,0.001,0.001,0,0.003,0,0.001,0
+Green Day,American Idiot,2004,0.011,0,0.011,0.011,0.016,0,0,0.011,0.016,0
+Kendrick Lamar,Alright,2015,0,0,0,0,0,0,0.016,0,0,0.001
+Childish Gambino,This Is America,2018,0,0,0,0,0,0,0,0,0,0
+Lil Baby,The Bigger Picture,2020,0.001,0,0,0,0,0,0.008,0,0,0.001
+Oliver Anthony Music,Rich Men North Of Richmond,2023,0,0,0.003,0,0.003,0,0,0,0,0.003

@@ -1,0 +1,17 @@
+artist,title,year,about_politics_claude_haiku_4_5_20251001,about_politics_gemini_3_flash_preview,about_politics_gemma3_4b,about_politics_gpt_5_mini,about_politics_gpt_5_nano,about_politics_meta_llama_llama_4_scout_17b_16e_instruct,about_politics_moonshotai_kimi_k2_instruct_0905,about_politics_openai_gpt_oss_120b,about_politics_openai_gpt_oss_20b,politics,num_models
+Johnny Horton,The Battle Of New Orleans,1959,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,0,0
+Johnny Cash,Don't Take Your Guns To Town,1959,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE,0,0
+Creedence Clearwater Revival,Fortunate Son,1969,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9
+Plastic Ono Band,Give Peace A Chance,1969,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9
+Marvin Gaye,What's Going On,1971,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9
+John Lennon/Plastic Ono Band,Imagine,1971,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9
+Bruce Springsteen,Born In The U.S.A.,1985,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9
+Frankie Goes To Hollywood,Two Tribes,1984,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9
+Scorpions,Wind Of Change,1991,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9
+Arrested Development,Mr. Wendal,1993,TRUE,TRUE,TRUE,TRUE,FALSE,TRUE,TRUE,TRUE,TRUE,0.8888888888888888,8
+The Black Eyed Peas,Where Is The Love?,2003,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9
+Green Day,American Idiot,2004,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9
+Kendrick Lamar,Alright,2015,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9
+Childish Gambino,This Is America,2018,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9
+Lil Baby,The Bigger Picture,2020,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9
+Oliver Anthony Music,Rich Men North Of Richmond,2023,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,TRUE,1,9

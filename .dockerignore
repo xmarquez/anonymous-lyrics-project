@@ -1,0 +1,82 @@
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# R specific
+.Rhistory
+.RData
+.Rproj.user
+*.Rproj
+
+# renv - exclude library but keep essential files
+renv/library/
+renv/local/
+renv/cellar/
+renv/lock/
+renv/python/
+renv/sandbox/
+renv/staging/
+# Keep these renv files (they're already explicitly COPYed in Dockerfile):
+# renv.lock
+# renv/activate.R
+# renv/settings.json
+# .Rprofile
+
+# Targets cache (will be rebuilt in container)
+_targets/
+
+# Environment files with secrets
+.Renviron
+.env
+
+# Documentation and reports (unless needed)
+*.html
+*.pdf
+*.docx
+~$*.docx
+
+# HPC specific files
+HPC/*.sif
+HPC/*.tar
+HPC/*.sh
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# Temporary files
+*.tmp
+*.temp
+.vdoc.*
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Data files (large data should be downloaded or mounted)
+# Adjust based on your needs - you may want to include data-raw/
+# data/
+# data-raw/
+
+# Output directories
+output/
+results/
+figures/
+
+# Node modules (if any JS/Quarto deps)
+node_modules/
+
+# Python virtual environments (if any)
+.venv/
+venv/
+__pycache__/
+*.pyc

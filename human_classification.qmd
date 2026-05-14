@@ -1,0 +1,368 @@
+---
+title: "Human validation of LLM political song classifications"
+format: html
+echo: false
+message: false
+warning: false
+---
+
+This document compares human coding of political content in song lyrics against the LLM-based classifications described in the main [LLM classification report](llm_classification.html).
+
+```{r}
+library(tidyverse)
+library(targets)
+library(irr)
+library(irrCAC)
+library(corrr)
+
+tar_load(human_coding_raw)
+tar_load(human_coding_wide)
+tar_load(human_llm_wide)
+tar_load(human_llm_long)
+tar_load(combined_responses_wide_politics_simple)
+tar_load(models_df)
+tar_load(human_coding_sample)
+
+theme_set(theme_bw())
+```
+
+## Sample Description
+
+The validation sample consists of `r nrow(human_coding_wide)` songs drawn from the full Hot 100 dataset using a stratified design: `r sum(human_coding_sample$sample_group == "not_political")` songs where no model classified the song as political (`num_models == 0`), and `r sum(human_coding_sample$sample_group == "likely_political")` songs where at least half the models classified the song as political. This stratified design over-represents political songs relative to the full dataset, so agreement statistics computed here should not be generalised directly to the full population of songs.
+
+Two coders independently coded all `r nrow(human_coding_wide)` songs for political content, providing a binary classification, a brief justification, and a confidence score (0--1).
+
+```{r}
+#| label: tbl-coder-summary
+#| tbl-cap: "Summary of human coding"
+human_coding_raw |>
+  group_by(coder_name) |>
+  summarise(
+    n = n(),
+    n_political = sum(is_political),
+    pct_political = scales::percent(mean(is_political), accuracy = 0.1),
+    mean_confidence = round(mean(confidence, na.rm = TRUE), 3)
+  ) |>
+  knitr::kable(col.names = c("Coder", "Songs coded", "Political", "% Political", "Mean confidence"))
+```
+
+## Inter-Coder Reliability (Human Coders)
+
+```{r}
+human_matrix <- human_coding_wide |>
+  select(is_political_coder_a, is_political_coder_b)
+
+cohen_k <- irr::kappa2(human_matrix)
+fleiss_k_human <- irr::kappam.fleiss(human_matrix)
+kripp_human <- irrCAC::krippen.alpha.raw(human_matrix)
+pct_agree <- mean(human_coding_wide$is_political_coder_a == human_coding_wide$is_political_coder_b)
+```
+
+The two human coders agreed on `r scales::percent(pct_agree, accuracy = 0.1)` of songs. Cohen's Kappa was `r round(cohen_k$value, 3)` (p `r ifelse(cohen_k$p.value < 0.001, "< 0.001", paste("=", round(cohen_k$p.value, 4)))`). Fleiss' Kappa was `r round(fleiss_k_human$value, 3)`. Krippendorff's Alpha was `r round(kripp_human$est[["coeff.val"]], 3)` `r kripp_human$est[["conf.int"]]`.
+
+```{r}
+#| label: tbl-confusion-human
+#| tbl-cap: "Confusion matrix: Coder A vs Coder B"
+human_coding_wide |>
+  count(is_political_coder_a, is_political_coder_b) |>
+  pivot_wider(names_from = is_political_coder_b, values_from = n, names_prefix = "coder_b_") |>
+  knitr::kable(col.names = c("Coder A", "Coder B: Not political", "Coder B: Political"))
+```
+
+## Human vs LLM Agreement
+
+We now treat each human coder as an additional rater alongside the `r nrow(models_df)` LLM models.
+
+```{r}
+agreement_matrix <- human_llm_wide |>
+  select(is_political_coder_a, is_political_coder_b, starts_with("about_politics")) |>
+  mutate(across(everything(), as.numeric))
+
+fleiss_k_all <- irr::kappam.fleiss(agreement_matrix)
+kripp_all <- irrCAC::krippen.alpha.raw(agreement_matrix)
+
+# LLM-only on same subset
+llm_only_matrix <- human_llm_wide |>
+  select(starts_with("about_politics")) |>
+  mutate(across(everything(), as.numeric))
+
+fleiss_k_llm <- irr::kappam.fleiss(llm_only_matrix)
+kripp_llm <- irrCAC::krippen.alpha.raw(llm_only_matrix)
+```
+
+On the `r nrow(human_llm_wide)`-song validation sample, Fleiss' Kappa across all raters (humans + LLMs) is `r round(fleiss_k_all$value, 3)`, compared to `r round(fleiss_k_llm$value, 3)` for the LLMs alone. Krippendorff's Alpha for all raters is `r round(kripp_all$est[["coeff.val"]], 3)` `r kripp_all$est[["conf.int"]]`, compared to `r round(kripp_llm$est[["coeff.val"]], 3)` for LLMs alone.
+
+```{r}
+#| label: tbl-agreement-comparison
+#| tbl-cap: "Agreement statistics: LLMs only vs LLMs + human coders"
+tibble(
+  Measure = c("Fleiss' Kappa", "Krippendorff's Alpha"),
+  `LLMs only` = c(round(fleiss_k_llm$value, 3), round(kripp_llm$est[["coeff.val"]], 3)),
+  `LLMs + Humans` = c(round(fleiss_k_all$value, 3), round(kripp_all$est[["coeff.val"]], 3))
+) |>
+  knitr::kable()
+```
+
+## Correlation Matrix
+
+```{r}
+#| label: fig-corr-human-llm
+#| fig-cap: "Correlation between human coders and LLM models"
+agreement_matrix |>
+  rename_with(\(x) str_remove_all(x, "about_politics_|is_political_")) |>
+  corrr::correlate() |>
+  corrr::rplot(print_cor = TRUE) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## IRT Difficulty
+
+We fit a one-parameter logistic (Rasch) IRT model treating each rater (human or LLM) as an item. The Rasch model constrains all discrimination parameters to be equal and estimates only the difficulty (threshold) parameter for each rater, reflecting how liberal or conservative each rater is in classifying a song as political. A 2PL model was also attempted but produced unstable discrimination estimates with extremely wide confidence intervals on this 600-song stratified sample; the Rasch model is better identified here.
+
+```{r}
+#| label: fig-irt-human-llm
+#| fig-cap: "IRT difficulty parameters including human coders (Rasch model). Higher values indicate a more liberal threshold for classifying songs as political."
+
+irt_model <- mirt::mirt(agreement_matrix,
+                        model = 1,
+                        itemtype = "Rasch",
+                        SE = TRUE,
+                        verbose = FALSE)
+
+coefs_df <- as.data.frame(mirt::coef(irt_model, as.data.frame = TRUE))
+coefs_df$variable <- rownames(coefs_df)
+
+difficulty_params <- coefs_df |>
+  filter(str_detect(variable, "\\.d$")) |>
+  mutate(
+    rater = str_remove(variable, "\\.d$") |>
+      str_remove_all("about_politics_|is_political_") |>
+      str_replace_all("\\.", "-"),
+    estimate = par,
+    pct025 = CI_2.5,
+    pct975 = CI_97.5
+  )
+
+ggplot(data = difficulty_params,
+       aes(x = reorder(rater, estimate),
+           y = estimate, ymin = pct025, ymax = pct975)) +
+  labs(x = "", y = "Difficulty parameter\n(higher = more liberal political classification threshold)") +
+  geom_point() +
+  geom_errorbar(width = 0.3) +
+  coord_flip()
+```
+
+## Human-LLM Disagreement
+
+```{r}
+n_models <- nrow(models_df)
+
+disagreement_data <- human_llm_wide |>
+  mutate(
+    human_consensus = case_when(
+      is_political_coder_a == 1 & is_political_coder_b == 1 ~ "Both political",
+      is_political_coder_a == 0 & is_political_coder_b == 0 ~ "Both not political",
+      TRUE ~ "Disagree"
+    ),
+    llm_political_count = rowSums(across(starts_with("about_politics")), na.rm = TRUE),
+    llm_majority = ifelse(llm_political_count > n_models / 2, "LLM majority political", "LLM majority not political")
+  )
+```
+
+```{r}
+#| label: tbl-human-llm-crosstab
+#| tbl-cap: "Human consensus vs LLM majority classification"
+disagreement_data |>
+  count(human_consensus, llm_majority) |>
+  pivot_wider(names_from = llm_majority, values_from = n, values_fill = 0) |>
+  knitr::kable()
+```
+
+### Per-Model Agreement with Human Consensus
+
+Where both human coders agree, we compute Cohen's Kappa between the human consensus and each LLM model.
+
+```{r}
+#| label: tbl-per-model-kappa
+#| tbl-cap: "Cohen's Kappa between each LLM model and human consensus (songs where both coders agree)"
+
+consensus_songs <- disagreement_data |>
+  filter(human_consensus != "Disagree") |>
+  mutate(human_political = as.integer(human_consensus == "Both political"))
+
+model_cols <- names(human_llm_wide) |>
+  str_subset("^about_politics_")
+
+per_model_kappa <- map_dfr(model_cols, \(col) {
+  k <- irr::kappa2(cbind(consensus_songs$human_political, consensus_songs[[col]]))
+  tibble(
+    model = str_remove(col, "about_politics_"),
+    kappa = round(k$value, 3),
+    p_value = k$p.value,
+    agreement = scales::percent(mean(consensus_songs$human_political == consensus_songs[[col]], na.rm = TRUE), accuracy = 0.1)
+  )
+})
+
+per_model_kappa |>
+  arrange(desc(kappa)) |>
+  knitr::kable(col.names = c("Model", "Cohen's Kappa", "p-value", "% Agreement"))
+```
+
+### Examples of Disagreement
+
+Songs where both human coders agree on political content but no LLM classifies them as political:
+
+```{r}
+#| label: tbl-human-political-llm-not
+#| tbl-cap: "Songs coded as political by both humans but not by any LLM (sample)"
+disagreement_data |>
+  filter(human_consensus == "Both political", llm_political_count == 0) |>
+  {\(d) slice_sample(d, n = min(10, nrow(d)))}() |>
+  select(song, artist, year) |>
+  knitr::kable()
+```
+
+@tbl-human-political-llm-not-justifications shows the human justifications for a sample of these songs. Note that coders sometimes justified their classifications by quoting relevant lyrics excerpts rather than writing original explanations.
+
+```{r}
+#| label: tbl-human-political-llm-not-justifications
+#| tbl-cap: "Human coder justifications for a sample of songs coded as political by both humans but not by any LLM"
+political_by_humans_only <- disagreement_data |>
+  filter(human_consensus == "Both political", llm_political_count == 0) |>
+  {\(d) slice_sample(d, n = min(3, nrow(d)))}()
+
+sanitize_for_table <- function(x) {
+  str_replace_all(x, "\\|", "/") |>
+    str_replace_all("\\n+", " / ") |>
+    str_squish()
+}
+
+justifications_h <- human_coding_raw |>
+  inner_join(political_by_humans_only |> select(prompt_digest), by = "prompt_digest") |>
+  mutate(justification = sanitize_for_table(justification) |> str_trunc(150)) |>
+  select(prompt_digest, song, artist, coder_name, justification) |>
+  pivot_wider(names_from = coder_name, values_from = justification, names_prefix = "justification_")
+
+justifications_h |>
+  select(song, artist, justification_coder_a, justification_coder_b) |>
+  knitr::kable(col.names = c("Song", "Artist", "Coder A justification (excerpt)", "Coder B justification (excerpt)"))
+```
+
+Songs where both human coders agree the song is not political but LLM majority classifies it as political:
+
+```{r}
+#| label: tbl-human-not-llm-political
+#| tbl-cap: "Songs coded as not political by both humans but classified as political by LLM majority (sample)"
+disagreement_data |>
+  filter(human_consensus == "Both not political", llm_political_count > n_models / 2) |>
+  {\(d) slice_sample(d, n = min(10, nrow(d)))}() |>
+  select(song, artist, year) |>
+  knitr::kable()
+```
+
+These two songs have political references that the human coders may have missed: one is about Eva Peron, the other about the assassination of JFK. @tbl-human-not-llm-justifications shows the human justifications.
+
+```{r}
+#| label: tbl-human-not-llm-justifications
+#| tbl-cap: "Human coder justifications for songs classified as not political by both humans but as political by LLM majority"
+not_political_by_humans <- disagreement_data |>
+  filter(human_consensus == "Both not political", llm_political_count > n_models / 2)
+
+justifications <- human_coding_raw |>
+  inner_join(not_political_by_humans |> select(prompt_digest), by = "prompt_digest") |>
+  mutate(justification = sanitize_for_table(justification) |> str_trunc(150)) |>
+  select(prompt_digest, song, artist, coder_name, justification) |>
+  pivot_wider(names_from = coder_name, values_from = justification, names_prefix = "justification_")
+
+justifications |>
+  select(song, artist, justification_coder_a, justification_coder_b) |>
+  knitr::kable(col.names = c("Song", "Artist", "Coder A justification (excerpt)", "Coder B justification (excerpt)"))
+```
+
+## Confidence Analysis
+
+```{r}
+#| label: fig-human-confidence
+#| fig-cap: "Distribution of human confidence scores by classification and coder"
+human_coding_raw |>
+  ggplot(aes(x = confidence, fill = as.factor(is_political))) +
+  geom_histogram(binwidth = 0.1, position = "dodge") +
+  facet_wrap(~coder_name) +
+  scale_fill_viridis_d() +
+  labs(x = "Confidence", y = "Count", fill = "Political")
+```
+
+```{r}
+#| label: fig-confidence-vs-llm-agreement
+#| fig-cap: "Human confidence vs number of LLMs classifying the song as political"
+human_coding_raw |>
+  inner_join(
+    human_llm_wide |>
+      mutate(llm_political_count = rowSums(across(starts_with("about_politics")), na.rm = TRUE)) |>
+      select(prompt_digest, llm_political_count),
+    by = "prompt_digest"
+  ) |>
+  ggplot(aes(x = llm_political_count, y = confidence, color = as.factor(is_political))) +
+  geom_jitter(alpha = 0.3, width = 0.2) +
+  geom_smooth(method = "loess") +
+  facet_wrap(~coder_name) +
+  scale_color_viridis_d() +
+  labs(x = "Number of LLMs classifying song as political",
+       y = "Human confidence",
+       color = "Human: political")
+```
+
+## Yearly Trends
+
+```{r}
+#| label: fig-yearly-human-llm
+#| fig-cap: "Proportion of songs classified as political, by rater and year (validation sample only)"
+human_llm_long |>
+  mutate(source = ifelse(model %in% c("coder_a", "coder_b"), "Human", "LLM")) |>
+  group_by(year, model, source) |>
+  summarise(avg = mean(about_politics, na.rm = TRUE), .groups = "drop") |>
+  ggplot(aes(x = year, y = avg, color = model, linetype = source)) +
+  geom_line() +
+  stat_summary(aes(group = source), fun = mean, geom = "line", linewidth = 1.2, linetype = "solid", alpha = 0.5) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_color_viridis_d() +
+  labs(y = "Proportion classified as political", x = "Year")
+```
+
+## Human Coder Justification Categories
+
+We used GPT-5.2 (reasoning effort "high") to extract common categories from the justifications provided by the human coders for their political classifications, using the same extraction prompt as for the LLM justifications. @tbl-human-categories shows the categories extracted from the human coder justifications, while @tbl-llm-categories-comparison shows the LLM-derived categories for comparison.
+
+```{r}
+tar_load(politics_categories_human)
+tar_load(politics_categories)
+```
+
+```{r}
+#| label: tbl-human-categories
+#| tbl-cap: "Categories extracted from human coder justifications by GPT 5.2"
+politics_categories_human |>
+  knitr::kable()
+```
+
+```{r}
+#| label: tbl-llm-categories-comparison
+#| tbl-cap: "Categories extracted from LLM justifications (for comparison)"
+politics_categories |>
+  knitr::kable()
+```
+
+## Classification Rates by Rater
+
+```{r}
+#| label: tbl-classification-rates
+#| tbl-cap: "Classification rates: human coders and LLM models on the validation sample"
+human_llm_long |>
+  group_by(model) |>
+  summarise(
+    n_political = sum(about_politics, na.rm = TRUE),
+    pct_political = scales::percent(mean(about_politics, na.rm = TRUE), accuracy = 0.1)
+  ) |>
+  arrange(desc(n_political)) |>
+  knitr::kable(col.names = c("Rater", "N political", "% Political"))
+```

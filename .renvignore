@@ -1,0 +1,8 @@
+simple-word-vector-model/
+lyrics-viewer/
+data-raw/
+classification-outputs/
+prompts/
+README.Rmd
+README.md
+llm_classification.docx

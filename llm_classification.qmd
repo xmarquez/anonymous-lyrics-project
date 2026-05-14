@@ -1,0 +1,707 @@
+---
+title: "Classification of political content in lyrics using LLMs"
+format: html
+echo: false
+message: false
+warning: false
+---
+
+This document describes the details of the pipeline used to classify political content in song lyrics.
+
+## Pipeline set up
+
+We use the R package `{targets}` to set up an automated pipeline for computational reproducibility. A full run of the pipeline takes the Hot 100 Billboard songs dataset (hosted on Kaggle, updated weekly, at <https://www.kaggle.com/datasets/ludmin/billboard?resource=download&select=hot100.csv>, downloaded on 22 December 2025 and saved to [data-raw]) to scrape the lyrics of most of these songs using the [Genius API](https://docs.genius.com/). It then sends these lyrics to a number of large language models (using functions in the `R` folder and prompts in the `prompts` folder) for classification and theme extraction. The pipeline uses `{renv}` to keep a stable R environment. The easiest way of running the pipeline is to use a Docker container. See the [DOCKER_SETUP.md] file for details.
+
+```{r}
+library(tidyverse)
+library(targets)
+library(irrCAC)
+library(irr)
+
+# tar_load(all_songs)
+tar_load(hot100_genius_full)
+# tar_load(scraped_songs) 
+# tar_load(usable_songs)
+tar_load(combined_responses_politics_simple)
+tar_load(combined_responses_politics_simple_enriched)
+tar_load(combined_responses_wide_politics_simple)
+tar_load(summarised_responses_politics_simple)
+tar_load(combined_responses_politics_themes_enriched)
+tar_load(hot100data)
+tar_load(politics_categories)
+tar_load(politics_simple_costs)
+tar_load(politics_themes_cost)
+tar_load(known_politics)
+tar_load(models_df)
+tar_load(clear_politics_songs)
+tar_load(politics_simple_prompts_full_raw)
+meta <- tar_meta()
+
+known_politics <- readr::read_csv(
+  here::here("data-raw", "known_politics_songs.csv"),
+  show_col_types = FALSE
+)
+
+normalize_join_key <- function(x) {
+  x |>
+    stringr::str_to_lower() |>
+    stringr::str_replace_all("[^[:alnum:]]+", " ") |>
+    stringr::str_squish()
+}
+
+politics_simple_prompt_lookup_all <- politics_simple_prompts_full_raw |>
+  distinct(prompt_digest, .keep_all = TRUE)
+
+combined_responses_politics_simple_all_matches <- combined_responses_politics_simple |>
+  distinct(prompt_digest, model, .keep_all = TRUE) |>
+  left_join(politics_simple_prompt_lookup_all, by = "prompt_digest") |>
+  filter(!is.na(song))
+
+summarised_responses_politics_simple_all_matches <- combined_responses_politics_simple_all_matches |>
+  group_by(prompt_digest, song, artist, year, genius_title, genius_artist, match_score) |>
+  summarise(
+    politics = mean(about_politics, na.rm = TRUE),
+    confidence_score = mean(confidence_score, na.rm = TRUE),
+    num_models = sum(about_politics, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+combined_responses_wide_politics_simple_all_matches <- combined_responses_politics_simple_all_matches |>
+  select(prompt_digest, model, about_politics, justification, confidence_score) |>
+  pivot_wider(
+    id_cols = prompt_digest,
+    names_from = model,
+    values_from = c(about_politics, justification, confidence_score)
+  ) |>
+  janitor::clean_names()
+
+politics_only_all_matches <- summarised_responses_politics_simple_all_matches |>
+  left_join(combined_responses_wide_politics_simple_all_matches, by = "prompt_digest")
+
+politics_only <- summarised_responses_politics_simple |>
+  ungroup()
+
+known_politics_classifications <- known_politics |>
+  mutate(
+    artist_key = normalize_join_key(artist),
+    title_key = normalize_join_key(title)
+  ) |>
+  left_join(
+    politics_only_all_matches |>
+      mutate(
+        artist_key = normalize_join_key(artist),
+        title_key = normalize_join_key(song)
+      ) |>
+      arrange(artist_key, title_key, match_score) |>
+      group_by(artist_key, title_key) |>
+      slice_head(n = 1) |>
+      ungroup() |>
+      select(
+        artist_key,
+        title_key,
+        match_score,
+        genius_title,
+        politics,
+        num_models,
+        starts_with("about_politics"),
+        starts_with("justification")
+      ),
+    by = c("artist_key", "title_key")
+  )
+
+theme_set(theme_bw())
+```
+
+## Data
+
+The basic data consists of the lyrics to the Billboard Hot 100 songs. The list of Billboard Hot 100 songs was obtained from Kaggle, which scrapes them weekly from the billboard website; this is hosted at <https://www.kaggle.com/datasets/ludmin/billboard?resource=download&select=hot100.csv>.
+
+We scraped the lyrics to the Hot 100 songs from `r min(hot100data$date)` to `r max(hot100data$date)`. The scraper finds the best match in the Genius dataset by string distance to the song and artist. Scraping takes approximately `r meta |> filter(name == "hot100_genius_full") |> pull(seconds) |> round() |> lubridate::as.duration() |> print()`, though with some starts and stops.
+
+Not every song in the Hot 100 dataset has matching lyrics, and the song-artist combination is not always a perfect match. We set a threshold of 0.5 for matching song and artist combinations (anything above is unmatched), though in practice we used a match distance below 0.3 for our analyses. @fig-match-by-match-score and @fig-match-proportions-by-match-score summarize the distribution of match scores (including unmatched songs, shown as NA); approximately `r hot100_genius_full |> ungroup() |> summarise(matched = sum(!is.na(match_score)), prop = sum(matched/n())) |> pull(prop) |> round(2)` of all songs were matched to lyrics. Most very recent songs have matching lyrics, as do late 1980s-early 1990s songs, though the matches are less precise in the 2000s. @tbl-example-of-match-discrepancies provides examples of imperfect matching; usually these are real matches input slightly differently in the Genius database by users. Our use of a match score below 0.3 is conservative.
+
+```{r}
+#| label: fig-match-by-match-score
+#| fig-cap: "Number of Hot 100 Billboard songs by match score (NA = unmatched)"
+hot100_genius_full |>
+  ggplot(aes(x = year, fill = as.factor(round(match_score, digits = 1)))) +
+  geom_bar(width = 1) +
+  labs(fill = "Match distance", y = "") +
+  scale_fill_viridis_d(na.value = "grey50") +
+  scale_y_continuous()
+```
+
+```{r}
+#| label: fig-match-proportions-by-match-score
+#| fig-cap: "Proportion of Hot 100 Billboard songs by match score (NA = unmatched)"
+hot100_genius_full |>
+  mutate(in_genius_dataset = !is.na(genius_id)) |>
+  ggplot(aes(x = year, fill = as.factor(round(match_score, digits = 1)))) +
+  geom_bar(width = 1, position = "fill") +
+  labs(fill = "Match distance", y = "") +
+  scale_fill_viridis_d(na.value = "grey50") +
+  scale_y_continuous(labels = scales::label_percent())
+```
+
+```{r}
+#| label: tbl-example-of-match-discrepancies
+#| tbl-cap: "Examples of match discrepancies in the dataset, by match score level"
+
+hot100_genius_full |>
+  mutate(match_score = round(match_score, digits = 1)) |>
+  group_by(match_score) |>
+  slice_sample(n = 2) |> 
+  select(song, artist, genius_title, genius_artist) |>
+  knitr::kable()
+```
+
+
+## Models, Prompts, and Costs
+
+We test the use of large language models (LLMs) to identify political content. We used `r nrow(models_df)` different LLMs: proprietary models from Anthropic (claude-haiku-4-5-20251001), OpenAI (gpt-5-mini, gpt-5-nano), and Google Gemini (gemini-3-flash-preview), plus additional open-weights models served via Groq (openai/gpt-oss-20b, openai/gpt-oss-120b, moonshotai/kimi-k2-instruct-0905, meta-llama/llama-4-scout-17b-16e-instruct) and a small model served locally on a laptop via Ollama (gemma3:4b).
+
+```{r}
+#| label: tbl-models
+#| tbl-cap: "LLMs used"
+
+models_df |>
+  select(api, model, processing) |>
+  mutate(api = case_when(
+    api == "claude" ~ "Anthropic",
+    api == "gemini" ~ "Google",
+    TRUE ~ api),
+    api = stringr::str_to_title(api),
+    type = case_when(
+      api == "Groq" ~ "Open weights model via commercial provider API",
+      api == "Ollama" ~ "Open weights model used locally",
+      TRUE ~ "Proprietary model"
+    )
+    ) |>
+  knitr::kable(col.names = c("API provider", "Model", "Processing strategy", "Type"))
+```
+
+We constructed a [prompt](prompts/politics-simple-prompt.md) that provided the LLM with the lyrics to the song and asked it to determine whether the song was "about politics", but did not further specify what "politics" meant. The prompt returned a response that included a single yes/no answer to the question of whether the lyrics of a given song were "about politics", a brief justification for the answer, and a confidence score between 0 and 1, wrapped in a JSON structure. All prompts used are included in the appendix. 
+
+Processing this entire set of lyrics through one language model consumes about `r politics_simple_costs |> dplyr::summarise(prompt_tokens = mean(input_tokens, na.rm = TRUE)) |> dplyr::pull(prompt_tokens) |> scales::label_number()()` prompt tokens and about `r politics_simple_costs |> dplyr::summarise(completion_tokens = mean(output_tokens, na.rm = TRUE)) |> dplyr::pull(completion_tokens) |> scales::label_number()()` completion tokens on average across models. This took `r meta |> dplyr::filter(name == "combined_responses_politics_simple") |> dplyr::summarise(seconds = sum(seconds, na.rm = TRUE)) |> dplyr::pull(seconds) |> lubridate::as.duration()` of wall time, though given that many targets were processed using batch mode this can be misleading (batches can take up to 24 hours to process, but sometimes complete much faster). 
+
+```{r}
+#| label: tbl-politics-simple-costs
+#| tbl-cap: "Token usage and costs of classification for simple politics classification task"
+
+politics_simple_costs |>
+  mutate(cost = scales::label_dollar()(cost)) |>
+  knitr::kable()
+```
+
+`r nrow(clear_politics_songs)` were classified as political by at least half of the models. We used a frontier model (GPT 5.2, with reasoning effort "high") to scrutinize the justifications offered by the models for why these songs were political and extract a set of categories (@tbl-politics-categories). The prompt used for this task is available [here](prompts/extract-politics-categories-prompt.md). We then used these extracted categories with [a prompt](prompts/politics-themes-prompt.md) asking each model to return themes from the songs classified as political by at least half the models. The distribution of these categories thus summarizes what each model thinks is in the domain of "politics".
+
+```{r}
+#| label: tbl-politics-categories
+#| tbl-cap: "Politics categories extracted from model justifications by GPT 5.2 Thinking."
+politics_categories |>
+  knitr::kable()
+```
+
+Extracting themes through one language model consumes about `r politics_themes_cost |> dplyr::summarise(prompt_tokens = mean(input_tokens, na.rm = TRUE)) |> dplyr::pull(prompt_tokens) |> scales::label_number()()` prompt tokens and about `r politics_themes_cost |> dplyr::summarise(completion_tokens = mean(output_tokens, na.rm = TRUE)) |> dplyr::pull(completion_tokens) |> scales::label_number()()` completion tokens on average across models. This took `r meta |> dplyr::filter(name == "combined_responses_politics_themes") |> dplyr::summarise(seconds = sum(seconds, na.rm = TRUE)) |> dplyr::pull(seconds) |> lubridate::as.duration()` of wall time, though again this can be misleading. 
+
+## Model Correlations
+
+```{r}
+politics_simple_rate_bounds <- combined_responses_politics_simple_enriched |>
+  filter(match_score < 0.3) |>
+  group_by(model) |>
+  summarise(prop = mean(about_politics, na.rm = TRUE), .groups = "drop") |>
+  summarise(min_prop = min(prop), max_prop = max(prop), .groups = "drop")
+
+fleiss_kappa <- combined_responses_wide_politics_simple |>
+  select(starts_with("about_politics")) |>
+  irr::kappam.fleiss()
+
+kripp_alpha <- combined_responses_wide_politics_simple |>
+  select(starts_with("about_politics")) |>
+  irrCAC::krippen.alpha.raw()
+```
+
+The language models classified between `r scales::percent(politics_simple_rate_bounds$min_prop, accuracy = 0.01)` and `r scales::percent(politics_simple_rate_bounds$max_prop, accuracy = 0.01)` of song lyrics as having political content (@tbl-simple-results), with the smallest model (gemma3:4b, run locally) being the most over-active classifier. They also agreed in identifying the late 1960s and early 1970s as the heyday of political content in the sample (@fig-yearly), with a flat or declining trend of political content since then, though with peaks in the late 1980s and early 1990s. But they also disagreed in some significant ways. Fleiss' Kappa coefficient was a respectable but not perfect `r round(fleiss_kappa$value, 3)`. Krippendorf's Alpha was similarly `r round(kripp_alpha$est[["coeff.val"]], 3)` `r kripp_alpha$est[["conf.int"]]`. 
+
+```{r}
+#| label: tbl-simple-results
+#| tbl-cap: "Songs about politics"
+
+combined_responses_politics_simple_enriched |>
+  filter(match_score < 0.3) |>
+  group_by(model) |>
+  summarise(total_politics = sum(about_politics, na.rm = TRUE),
+            avg_politics = mean(about_politics, na.rm = TRUE) |>
+              scales::percent(accuracy = 0.01)) |>
+  knitr::kable(col.names = c("Model", "Total songs identified", "Proportion"))
+```
+
+
+```{r}
+#| label: fig-yearly
+#| fig-cap: "Proportion of songs with political content, per model and year"
+combined_responses_politics_simple_enriched |>
+  filter(match_score < 0.3) |>
+  group_by(year, model) |> 
+  summarise(avg = mean(about_politics, na.rm = TRUE), .groups = "drop") |> 
+  ggplot(aes(x = year, y = avg)) + 
+  geom_line(aes(color = model)) + 
+  stat_summary() +
+  scale_y_continuous(labels = scales::percent) +
+  labs(y = "Proportion of songs with political content") +
+  scale_color_viridis_d()
+```
+
+The median correlation between models is around 0.7, but the maximum is only 0.83, and some are as low as 0.43. A correlation plot (@fig-corr) indicates that the Gemma3:4B model has the lowest degree of correlation with the other models (slightly below 0.6). It is also an outlier in classifying the most songs as having political content. A latent variable analysis of the classifications, using a 2 parameter logistic model (@fig-disc) also points to Gemma3:4B as the most idiosyncratic model (with the lowest discrimination parameter), followed by the second smallest model (openai/gpt-oss-20b). This presumably indicates that smaller models are less able to perform this task consistently.
+
+```{r}
+#| label: fig-corr
+#| fig-cap: "Correlation between models"
+combined_responses_wide_politics_simple |>
+  select(starts_with("about_politics")) |>
+  rename_with(\(x) str_remove_all(x, "about_politics_")) |>
+  mutate(across(everything(), as.numeric)) |>
+  corrr::correlate() |>
+  corrr::rplot(print_cor = TRUE) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+#| label: fig-disc
+#| fig-cap: "LLM discrimination (based on 2-parameter logistic model)"
+
+
+model <- mirt::mirt(combined_responses_wide_politics_simple |>
+                      select(starts_with("about_politics")) |>
+                      mutate(across(everything(), as.numeric)),
+                    model = 1,
+                    itemtype = "2PL",
+                    SE = TRUE,
+                    verbose = FALSE)
+
+cutpoints <- function(model, type = "score") {
+  stopifnot(class(model) == "SingleGroupClass")
+
+  type <- match.arg(type, c("score", "discrimination"))
+
+  # A hack to get around the "no visible binding for global variable" note
+
+  par <- CI_2.5 <- CI_97.5 <- variable <- se <- NULL
+
+  estimate <- pct025 <- pct975 <- coef_type <- coef <- NULL
+
+  coefs <- as.data.frame(mirt::coef(model, as.data.frame = TRUE))
+
+  coefs <- coefs |>
+    mutate(variable = rownames(coefs),
+           coef_type = stringr::str_extract(variable,"a([0-9]+)?$|d([0-9]+)?$"),
+           variable = stringr::str_replace(variable,"\\.a([0-9]+)?$|\\.d([0-9]+)?$",""))
+
+  coefs <- coefs |>
+    group_by(variable) |>
+    mutate(estimate = (par)/-(par[1]),
+           pct975 = (CI_2.5)/-(CI_2.5[1]),
+           pct025 = (CI_97.5)/-(CI_97.5[1]),
+           se = abs(pct975 - estimate)/1.96) |>
+    filter(!is.na(coef_type))
+
+  num_obs <- model@Data$data |>
+    as_tibble() |>
+    summarise_all(~sum(!is.na(.))) |>
+    tidyr::gather("variable", "num_obs")
+
+  coefs <- coefs |>
+    left_join(num_obs,
+              by = "variable")
+
+  if(type == "score") {
+    coefs <- coefs |>
+      filter(!grepl("^a",coef_type)) |>
+      select(variable,
+             estimate,
+             pct025,
+             pct975,
+             se,
+             num_obs)
+  } else {
+    coefs <- coefs |>
+      filter(grepl("^a",coef_type)) |>
+      mutate(estimate = par,
+             pct025 = CI_2.5,
+             pct975 = CI_97.5) |>
+      select(variable,
+             estimate,
+             pct025,
+             pct975,
+             num_obs)
+  }
+
+  coefs |> ungroup()
+
+
+}
+discrimination_parameters <- cutpoints(model, type = "discrimination") |>
+  mutate(variable = str_remove_all(variable, "about_politics_") |>
+           str_replace_all("\\.", "-"))
+
+ggplot(data = discrimination_parameters,
+       aes(x=reorder(variable,estimate),
+           y = estimate, ymin = pct025,
+           ymax = pct975))  +
+           labs(x="",y="Discrimination parameter for each model
+                \n(higher value means fewer idiosyncratic\nerrors relative to latent score)") +
+  geom_point() +
+  geom_errorbar() +
+  coord_flip()
+```
+
+## Validation: Classifying Known Political Songs
+
+Nearly all of the songs in the subsample of "known political songs" (Table 4 in main paper) are correctly identified by all models as political (@tbl-known-politics). Johnny Cash's "Don't take your guns to town" and Johnny Horton's "The Battle of New Orleans" are the exceptions: all models classify these two songs as non-political, and see them as personal stories (@tbl-johnny-cash).
+
+```{r}
+#| label: tbl-known-politics
+#| tbl-cap: "Known political songs"
+
+known_politics_classifications |>
+  select(artist, title, starts_with("about_politics"), politics, num_models) |>
+  rename_with(\(x) str_remove(x, "about_politics_")) |>
+  knitr::kable()
+
+```
+
+Cover songs are also classified mostly correctly, though some models fail to classify them properly (@tbl-imagine).
+
+```{r}
+#| label: tbl-imagine
+#| tbl-cap: "'Imagine' and 'What's Going On' covers"
+
+politics_only_all_matches |>
+  filter(song %in% c("Imagine", "What's Going On")) |>
+  filter(!artist %in% c("John Lennon/Plastic Ono Band", "Marvin Gaye", "Ariana Grande")) |>
+  arrange(song, year, artist) |>
+  select(artist, song, year, starts_with("about_politics")) |>
+  rename_with(\(x) str_remove(x, "about_politics_")) |>
+  knitr::kable()
+```
+
+
+
+```{r}
+#| label: tbl-johnny-cash
+#| tbl-cap: "Justification for classifying Johnny Cash's 'Don't Take Your Guns to Town' as a non-political song"
+
+known_politics_classifications |>
+  select(artist, genius_title, starts_with("justification")) |>
+  filter(artist == "Johnny Cash", str_detect(genius_title, "Guns to Town")) |>
+  pivot_longer(starts_with("justification"), names_to = "Model", values_to = "Justification") |>
+  select(Model, Justification) |>
+  mutate(Model = str_remove(Model, "justification_")) |>
+  knitr::kable()
+```
+
+
+## Dubiously Political Songs
+
+There are `r politics_only |> filter(num_models == 1) |> nrow()` songs that are classified as containing political content by only one model, mostly Gemma3, which is sometimes quite imaginative in detecting references to politics. 
+
+```{r}
+#| label: tbl-politics-only-one-model
+#| tbl-cap: "Justifications given by different models for songs classified as political by only one model: sample of 10 random songs"
+combined_responses_politics_simple_enriched |>
+  filter(match_score < 0.3) |> 
+  group_by(prompt_digest) |> 
+  filter(sum(about_politics) == 1) |> 
+  filter(about_politics | model == "gpt-5-mini") |>
+  group_by(prompt_digest) |>
+  filter(n() == 2) |>
+  ungroup() |>
+  mutate(model_type = ifelse(about_politics, 
+                             "Model identifying political content", 
+                             "Model not identifying political content")) |>
+  pivot_wider(id_cols = c(artist, song, year, lyrics), 
+              names_from = model_type, 
+              values_from = c(model, justification)) |>
+  slice_sample(n = 10) |>
+  select(-lyrics) |>
+  select(-`model_Model not identifying political content`) |>
+  knitr::kable(col.names = c("Artist", "Title", "Year", "Model identifying political content",
+                             "Justification for political content",
+                             "Justification for non-political content from gpt-5-mini"))
+
+```
+
+
+## Measures of uncertainty output by language models
+
+Each model was instructed to output a "confidence score" (a number between 0 and 1) quantifying its confidence in its classification. All models expressed less confidence in their classifications of political songs than in their classifications of non-political songs. They also differed somewhat in their degree of confidence, with gpt-5 nano and claude-haiku-4.5 expressing much lower confidence in their "political" classifications than the other models. Overall, however, the confidence of the models improves when they are in the majority (@fig-confidence-by-model).
+
+```{r}
+#| label: fig-confidence-by-model
+#| fig-cap: "Average confidence by model, split by whether the song is classified as political."
+combined_responses_politics_simple_enriched |>
+  filter(match_score < 0.3, !is.na(about_politics)) |>
+  group_by(model, about_politics) |> 
+  summarise(avg = mean(confidence_score, na.rm = TRUE), .groups = "drop") |>
+  mutate(classification = if_else(about_politics, "Political", "Non-political")) |>
+  ggplot(aes(x = avg, y = forcats::fct_reorder(model, avg), color = classification)) +
+  geom_line(aes(group = model), color = "grey70", linewidth = 0.4) +
+  geom_point(size = 2.5) +
+  scale_x_continuous(labels = scales::percent) +
+  labs(x = "Average confidence", y = "", color = "") +
+  coord_cartesian(xlim = c(0.5, 1))
+```
+
+The next plot is a diagnostic figure used to show the song-level relationship between confidence and agreement; it is not one of the manuscript figures.
+
+```{r}
+#| label: fig-confidence-political
+#| fig-cap: "Diagnostic: confidence scores for political classifications, by the number of models labeling a song as political"
+combined_responses_politics_simple_enriched |>
+  filter(match_score < 0.3) |> 
+  distinct(prompt_digest, model, .keep_all = TRUE) |>
+  group_by(prompt_digest) |> 
+  mutate(num_models = sum(about_politics, na.rm = TRUE)) |> 
+  ungroup() |>
+  filter(num_models > 0, about_politics) |>  
+  ggplot(aes(y = num_models, x = confidence_score)) + 
+  geom_count(aes(color = model), position = "jitter", alpha = 0.2) + 
+  stat_summary() +
+  geom_smooth() +
+  labs(y = "Number of models classifying a song as political",
+       x = "Confidence level",
+       size = "Number of songs") +
+  scale_color_viridis_d()
+```
+
+We can use this fact to construct a confidence-weighted measure of political content in the dataset, multiplying whether a song is classified as political by the confidence score, and average across all models. This index shows the same temporal patterns as the raw "about politics" classifications, but it also allows us to select the songs that the models are *most confident* and *least confident* in describing as about politics. 
+
+```{r}
+#| label: fig-confidence-weighted
+#| fig-cap: "Confidence-weighted measure of political content, per model and year."
+combined_responses_politics_simple_enriched |>
+  filter(match_score < 0.3) |> 
+  group_by(year, model) |> 
+  summarise(avg = weighted.mean(about_politics, confidence_score, na.rm = TRUE)) |> 
+  ggplot(aes(x = year, y = avg)) +
+  geom_line(aes(color = model, linetype = model)) +
+  stat_summary() +
+  scale_y_continuous(labels = scales::percent) +
+  labs(y = "Proportion of songs about politics,\nweighted by confidence") +
+  scale_color_viridis_d() 
+```
+
+By this measure, there are only about 417 songs with clear political content (weighted confidence scores above 0.8), heavily concentrated in the late 1960s and early 1970s.
+
+```{r}
+#| label: tbl-confidence-scores
+#| tbl-cap: "Distribution of confidence-weighted politics scores"
+
+combined_responses_politics_simple_enriched |>
+  filter(match_score < 0.3)  |> 
+  group_by(prompt_digest, year, song, artist) |> 
+  summarise(politics = weighted.mean(about_politics,confidence_score, na.rm = TRUE)) |>
+  arrange(desc(politics)) |>
+  ungroup() |>
+  mutate(quantile = cut(politics, 5)) |>
+  count(quantile) |>
+  knitr::kable(col.names = c("Confidence-weighted politics score", "n"))
+```
+
+```{r}
+#| label: fig-density-politics-per-year
+#| fig-cap: "Density estimation of most clearly political songs, by year"
+combined_responses_politics_simple_enriched |>
+  filter(match_score < 0.3)  |>   
+  group_by(prompt_digest, year, song, artist) |> 
+  summarise(politics = weighted.mean(about_politics,confidence_score)) |>
+  arrange(desc(politics)) |>
+  ungroup() |>
+  mutate(quantile = cut(politics, 5)) |>
+  filter(politics > 0.8) |>
+  ggplot(aes(x = year))  +
+  geom_density() +
+  labs(y = "Distribution of most clearly political songs")
+```
+
+## Popularity
+
+Explicitly political songs stayed on the charts for fewer weeks than non-political songs, though there are some outliers.
+
+```{r}
+#| label: fig-popularity
+#| fig-cap: "Weeks on Billboard chart (log scale), depending on whether a song is classified as political by a model."
+combined_responses_politics_simple_enriched |>
+  filter(match_score < 0.3) |> 
+  filter(!is.na(about_politics)) |>
+  ggplot(aes(x = year, y = weeks, color = as.factor(about_politics))) + 
+  geom_count(position = "jitter", alpha = 0.2) +
+  geom_smooth() +
+  scale_color_viridis_d() +
+  scale_y_log10() +
+  labs(y = "Weeks on the Billboard chart",
+       color = "About politics?")
+```
+
+## Political Themes
+
+We also attempted to classify the political themes of these songs. First GPT-5.2 (reasoning effor "high") generated a list of political categories from the universe of jsutifications given by the models for classifying something as political (@tbl-theme-categories); we then asked each model to look through the clearly political songs and extract between 1 and 4 themes using thesecategories. We excluded Gemma3b in this exercise, since it did not produce correctly formatted output. The most common theme categories involved inequality and class struggle, followed by war and militarism as well as racial issues.
+
+```{r}
+#| label: tbl-theme-categories
+#| tbl-cap: "Theme categories; derived by GPT-5.2 from the justifications given by all models."
+combined_responses_politics_themes_enriched |>
+  unnest(themes) |>
+  mutate(themes = fct_lump(themes, n = 10)) |>
+  left_join(
+    politics_categories |>
+      rename(themes = category)) |>
+  mutate(category = paste(themes, description, sep = ": ")) |>
+  janitor::tabyl(category) |>
+  arrange(desc(n)) |>
+  janitor::adorn_pct_formatting() |>
+  knitr::kable()
+```
+
+Nevetheless the models vary substantially in how often they classified songs using these categories (@fig-theme-distribution-per-model).
+
+```{r}
+#| label: fig-theme-distribution-per-model
+#| fig-cap: "Distribution of themes per model." 
+combined_responses_politics_themes_enriched |>
+  unnest(themes) |>
+  mutate(themes = fct_infreq(themes)) |>
+  ggplot(aes(fill = themes, x = model)) +
+  geom_bar(position = "fill") +
+  scale_fill_viridis_d() +
+  scale_y_continuous(labels = scales::percent_format()) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(y = "", c = "")
+```
+
+Some themes are more frequent in earlier decades (@fig-theme-distribution), especially environmental degradation, compared to culture war issues, which are more frequent in the 2020s. The nationalism theme appears more uniformly than most.
+
+```{r}
+#| label: fig-theme-distribution
+#| fig-cap: "Distribution of top themes over time."
+#| fig-height: 9
+library(ggridges)
+
+combined_responses_politics_themes_enriched |>
+  unnest(themes) |>
+  left_join(
+    politics_categories |>
+      rename(themes = category)) |>
+  distinct(prompt_digest, model, themes, .keep_all = TRUE) |>
+  filter(!is.na(song)) |>
+  mutate(category = paste(themes, description, sep = ": "))  |>
+  ggplot(aes(x = year, y = fct_reorder(category, year))) +
+  stat_density_ridges() +
+  # facet_wrap(~model) +
+  labs(y = "")
+  
+
+```
+
+```{r}
+#| label: fig-theme-distribution-per-model-ridges
+#| fig-cap: "Distribution of top themes over time, by model."
+#| fig-height: 9
+
+combined_responses_politics_themes_enriched |>
+  unnest(themes) |>
+  left_join(
+    politics_categories |>
+      rename(themes = category)) |>
+  distinct(prompt_digest, model, themes, .keep_all = TRUE) |>
+  filter(!is.na(song)) |>
+  mutate(category = paste(themes, description, sep = ": "))  |>
+  ggplot(aes(x = year, y = fct_reorder(category, year))) +
+  stat_density_ridges() +
+  facet_wrap(~model) +
+  labs(y = "")
+  
+
+```
+
+Agreement on whether a given theme is present varies across themes (@tbl-correlations), and ranges from a substantial 0.83(Racism) to a moderate 0.52 (media manipulation). These kappas treat theme presence as a binary indicator and can be sensitive to prevalence.
+
+```{r}
+#| label: tbl-correlations
+#| tbl-cap: "Fleiss' Kappa for binary theme presence across models."
+base_ids <- combined_responses_politics_themes_enriched |>
+  distinct(prompt_digest, model)
+
+theme_presence <- combined_responses_politics_themes_enriched |>
+  select(prompt_digest, model, themes) |>
+  unnest(themes) |>
+  distinct(prompt_digest, model, themes) |>
+  mutate(present = 1L)
+
+kappa_by_theme <- sort(unique(theme_presence$themes)) |>
+  map_dfr(\(th) {
+    mat <- base_ids |>
+      left_join(filter(theme_presence, themes == th),
+                by = c("prompt_digest", "model")) |>
+      mutate(present = ifelse(is.na(present), 0L, 1L)) |>
+      pivot_wider(id_cols = prompt_digest,
+                  names_from = model,
+                  values_from = present)
+    irrCAC::fleiss.kappa.raw(mat |> select(-prompt_digest))$est |>
+      mutate(category = th)
+  })
+
+kappa_by_theme |>
+  left_join(politics_categories, by = "category") |>
+  arrange(desc(coeff.val)) |>
+  transmute(category,
+            description,
+            kappa = coeff.val,
+            conf_int = conf.int) |>
+  knitr::kable(digits = 2,
+               col.names = c("Category", "Description", "Kappa", "95% CI"))
+```
+
+Clustering on the average presence of particular themes indicates that the Llama models have the most idiosyncratic classification. 
+```{r}
+themes_wide <- combined_responses_politics_themes_enriched |>
+  unnest(themes) |>
+  filter(themes %in% politics_categories$category) |>
+  distinct(prompt_digest, model, themes) |> 
+  mutate(values = 1L) |> 
+  pivot_wider(
+    id_cols = c(prompt_digest, model),
+    names_from = themes,
+    values_from = values,
+    values_fill = 0,
+    values_fn = max
+  ) |>
+  janitor::clean_names()
+
+model_mat <- themes_wide |>
+  select(model, starts_with("category")) |>
+  group_by(model) |>
+  summarise(across(starts_with("category"), \(x) mean(x, na.rm = TRUE))) |>
+  tibble::column_to_rownames("model") |>
+  as.matrix()
+
+d  <- dist(model_mat, method = "euclidean")
+hc <- hclust(d, method = "ward.D2")
+plot(hc)
+
+```
+
+## Appendix
+
+### Prompt for detecting political content
+
+{{< include prompts/politics-simple-prompt.md >}}
+
+### Prompt for extracting themes in model justifications
+
+{{< include prompts/extract-politics-categories-prompt.md >}}
+
+### User prompt for theme classification
+
+{{< include prompts/politics-themes-prompt.md >}}

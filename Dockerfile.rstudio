@@ -1,0 +1,48 @@
+# Dockerfile for RStudio Server with renv
+# This provides an interactive RStudio environment with all project dependencies
+
+FROM rocker/rstudio:4.5.2
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    libcurl4-openssl-dev \
+    libssl-dev \
+    libxml2-dev \
+    libglpk-dev \
+    wget \
+    cmake \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variable for nanonext
+ENV NANONEXT_LIBS=1
+
+# Set working directory
+WORKDIR /home/rstudio/project
+
+# Copy renv infrastructure (as rstudio user for permissions)
+COPY --chown=rstudio:rstudio renv.lock renv.lock
+COPY --chown=rstudio:rstudio .Rprofile .Rprofile
+COPY --chown=rstudio:rstudio renv/activate.R renv/activate.R
+COPY --chown=rstudio:rstudio renv/settings.json renv/settings.json
+
+# Install renv and restore packages
+USER rstudio
+RUN R -e "install.packages('renv', repos = c(CRAN = 'https://cloud.r-project.org'))"
+RUN R -e "renv::restore()"
+
+# Switch back to root to copy project files
+USER root
+COPY --chown=rstudio:rstudio . /home/rstudio/project
+
+# Create logs directory
+RUN mkdir -p /home/rstudio/project/logs && \
+    chown -R rstudio:rstudio /home/rstudio/project
+
+# Switch to rstudio user for running RStudio Server
+USER rstudio
+
+# Expose RStudio Server port
+EXPOSE 8787
+
+# RStudio Server is started automatically by the base image

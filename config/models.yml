@@ -1,0 +1,81 @@
+# Models configuration for ellmer
+# Each API lists an ellmer chat function and a set of models.
+# Optional fields:
+#   enabled: false
+#   params: { ... }  # extra arguments passed to the ellmer function
+#   prompt_batch_size: 5
+#   processing: sequential|parallel|batch
+
+groq:
+  ellmer_function: chat_groq_developer
+  models:
+    - name: openai/gpt-oss-20b
+      enabled: true
+      prompt_batch_size: 500
+      processing: batch
+    - name: openai/gpt-oss-120b
+      enabled: true
+      prompt_batch_size: 500
+      processing: batch
+    - name: moonshotai/kimi-k2-instruct-0905
+      enabled: true
+      prompt_batch_size: 500
+      processing: parallel
+    - name: meta-llama/llama-4-scout-17b-16e-instruct
+      enabled: true
+      prompt_batch_size: 500
+      processing: batch
+
+mistral:
+  ellmer_function: chat_mistral
+  models:
+    - name: mistral-small-latest
+      enabled: false
+    - name: ministral-3b-latest
+      enabled: false
+    - name: open-mixtral-8x7b
+      enabled: false
+
+claude:
+  ellmer_function: chat_claude
+  prompt_batch_size: 500
+  models:
+    - name: claude-haiku-4-5-20251001
+      processing: batch
+
+
+openai:
+  ellmer_function: chat_openai
+  prompt_batch_size: 500
+  models:
+    - name: gpt-5-mini
+      processing: batch
+      enabled: true
+    - name: gpt-5-nano
+      processing: batch
+      enabled: true
+
+gemini:
+  ellmer_function: chat_google_gemini
+  prompt_batch_size: 500
+  models:
+    - name: gemini-3-flash-preview
+      processing: parallel
+      enabled: true
+
+deepseek:
+  ellmer_function: chat_deepseek
+  models:
+    - name: deepseek-chat
+      enabled: false
+
+ollama:
+  ellmer_function: chat_ollama
+  prompt_batch_size: 500
+  models:
+    - name: gemma3:4b
+      enabled: true
+      processing: sequential
+    - name: qwen3:8b
+      enabled: false
+      processing: sequential

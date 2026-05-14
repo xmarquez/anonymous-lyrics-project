@@ -1,0 +1,4 @@
+*.RData filter=lfs diff=lfs merge=lfs -text
+_targets/meta/meta filter=lfs diff=lfs merge=lfs -text
+classification-outputs/all_models_lyrics_political_content.rds filter=lfs diff=lfs merge=lfs -text
+classification-outputs/all_models_lyrics_political_content.csv filter=lfs diff=lfs merge=lfs -text

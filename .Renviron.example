@@ -1,0 +1,34 @@
+# Example environment variables for the Lyrics project
+# Copy this file to .Renviron and fill in your actual API keys
+# IMPORTANT: Never commit .Renviron to version control!
+
+# Anthropic API Key (for Claude models via ellmer)
+# Get your key from: https://console.anthropic.com/
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+
+# Groq API Key (for groqDeveloper package)
+# Get your key from: https://console.groq.com/
+GROQ_API_KEY=your_groq_api_key_here
+
+# Genius API Token (for lyrics scraping)
+# Get your token from: https://genius.com/api-clients
+GENIUS_API_TOKEN=your_genius_api_token_here
+
+# Google Gemini API Key (for Gemini models via ellmer)
+# Get your key from: https://makersuite.google.com/app/apikey
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# OpenAI API Key (for GPT models via ellmer)
+# Get your key from: https://platform.openai.com/api-keys
+OPENAI_API_KEY=your_openai_api_key_here
+
+# Mistral API Key (for Mistral models via ellmer)
+# Get your key from: https://console.mistral.ai/
+MISTRAL_API_KEY=your_mistral_api_key_here
+
+# Reticulate Python path for Empath, only if running locally outside Docker.
+# Docker sets RETICULATE_PYTHON inside the image automatically.
+# Windows:
+# RETICULATE_PYTHON=.venv/empath/Scripts/python.exe
+# Linux/macOS:
+# RETICULATE_PYTHON=.venv/empath/bin/python

@@ -1,0 +1,2 @@
+# Python dependencies for the Empath pipeline
+empath

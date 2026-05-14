@@ -1,0 +1,11 @@
+artist,title,year,model,political_interpretation,non_political_interpretation
+Twenty One Pilots,Jumpsuit,2018,gemma3:4b,Societal pressure interpreted as political systems,Personal struggle; no political actors
+Jay-Z ft. R. Kelly,Guilty Until Proven Innocent,2001,gemma3:4b,Critique of media bias and justice system,"Personal legal issues, not politics"
+Pearl Jam,Given to Fly,1998,gemma3:4b,Metaphors of oppression and control,Personal resilience and symbolism
+Bob Dylan,I Want You,1966,gemma3:4b,References to political/social figures,Romantic longing dominates
+P!nk,Stupid Girls,2006,gemma3:4b,Critique of societal values,"Cultural critique, not politics"
+Bob Dylan,Tangled Up in Blue,1975,gemma3:4b,References to revolution and slavery,Personal narrative
+James Gang,Funk #49,1970,gemma3:4b,Implied surveillance and control,Personal behaviour
+Ice Cube ft. Das EFX,Check Yo Self,1993,gemma3:4b,References to policing tensions,Street life focus
+Sammy Hagar,I Can’t Drive 55,1984,kimi-k2,Protest against speed limit law,Personal frustration
+Imagine Dragons,Natural,2018,gemma3:4b,Themes of corrupt systems,Individual resilience
