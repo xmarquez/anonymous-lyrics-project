@@ -848,4 +848,26 @@ table_8 <- map_dfr(model_cols, \(col) {
 write_table(table_8, "table_8_human_model_agreement.csv")
 write_table(politics_categories_human_public, "appendix_human_categories.csv")
 
+# Table E1: token usage and estimated costs, using the pipeline's cost function and price list
+source(file.path("R", "helpers.R"))
+simple_costs <- llm_politics_simple_public |>
+  estimate_model_costs(model_pricing_table())
+themes_costs <- llm_politics_themes_public |>
+  distinct(prompt_digest, model, .keep_all = TRUE) |>
+  estimate_model_costs(model_pricing_table())
+table_e1 <- simple_costs |>
+  transmute(
+    model,
+    processing,
+    input_tokens_millions = round(input_tokens / 1e6, 1),
+    output_tokens_millions = round(output_tokens / 1e6, 1),
+    cost_classification_usd = round(cost, 2)
+  ) |>
+  left_join(
+    themes_costs |> transmute(model, cost_themes_usd = round(cost, 2)),
+    by = "model"
+  ) |>
+  arrange(desc(cost_classification_usd))
+write_table(table_e1, "appendix_table_e1_llm_costs.csv")
+
 message("Public manuscript and appendix outputs written to: ", normalizePath(file.path("results", "public")))

@@ -146,7 +146,12 @@ llm_politics_simple_public <- combined_responses_politics_simple_enriched |>
     model,
     about_politics,
     confidence_score,
-    justification
+    justification,
+    processing,
+    input_tokens,
+    cached_input_tokens,
+    output_tokens,
+    cost
   ) |>
   arrange(prompt_digest, model)
 
@@ -160,7 +165,12 @@ llm_politics_themes_public <- combined_responses_politics_themes_enriched |>
     themes,
     politics,
     confidence_score,
-    num_models
+    num_models,
+    processing,
+    input_tokens,
+    cached_input_tokens,
+    output_tokens,
+    cost
   ) |>
   tidyr::unnest_longer(themes, values_to = "theme", keep_empty = TRUE) |>
   mutate(theme = as.character(theme)) |>
@@ -242,6 +252,8 @@ if (length(violence_topic) == 0 || max(topic_scores) == 0) {
   violence_topic <- 70
 }
 
+# plot.estimateEffect() simulates the confidence band; fix the seed so repeated exports are identical
+set.seed(14850)
 stm_violence_plot_data <- plot(
   stm_effects,
   "Year",
@@ -439,8 +451,8 @@ written_files <- bind_rows(
 manifest <- tribble(
   ~stem, ~description, ~source_object, ~contains_full_lyrics, ~contains_lyric_quotes, ~used_for,
   "human_coding_public", "Anonymized human classifications and justifications.", "human_coding_raw", FALSE, TRUE, "Human-validation tables and appendix human-coding figures.",
-  "llm_politics_simple_public", "Song-model political-content classifications and justifications without full lyrics.", "combined_responses_politics_simple_enriched", FALSE, TRUE, "Current manuscript Figures 2-6 plus appendix LLM and human-validation figures.",
-  "llm_politics_themes_public", "Song-model political-theme classifications in long form.", "combined_responses_politics_themes_enriched", FALSE, FALSE, "Theme tables and appendix theme figures.",
+  "llm_politics_simple_public", "Song-model political-content classifications, justifications, and per-response token usage and cost, without full lyrics.", "combined_responses_politics_simple_enriched", FALSE, TRUE, "Current manuscript Figures 2-6, appendix LLM and human-validation figures, and Table E1 (costs).",
+  "llm_politics_themes_public", "Song-model political-theme classifications in long form; token and cost columns are per response and repeat across a response's theme rows.", "combined_responses_politics_themes_enriched", FALSE, FALSE, "Theme tables, appendix theme figures, and Table E1 (costs).",
   "politics_categories_public", "Theme-category lookup table.", "politics_categories", FALSE, FALSE, "Theme tables.",
   "politics_categories_human_public", "Human-justification category lookup table.", "politics_categories_human", FALSE, FALSE, "Human-validation appendix tables.",
   "song_features_public", "Song-level match metadata plus non-text lyric-availability and keyword indicators.", "hot100_genius_full", FALSE, FALSE, "Current manuscript Figure 1 and appendix lyric-match/keyword figures.",

@@ -50,23 +50,23 @@ human_coding_raw |>
 
 ```{r}
 human_matrix <- human_coding_wide |>
-  select(is_political_coder_a, is_political_coder_b)
+  select(is_political_coder_b, is_political_coder_a)
 
 cohen_k <- irr::kappa2(human_matrix)
 fleiss_k_human <- irr::kappam.fleiss(human_matrix)
 kripp_human <- irrCAC::krippen.alpha.raw(human_matrix)
-pct_agree <- mean(human_coding_wide$is_political_coder_a == human_coding_wide$is_political_coder_b)
+pct_agree <- mean(human_coding_wide$is_political_coder_b == human_coding_wide$is_political_coder_a)
 ```
 
 The two human coders agreed on `r scales::percent(pct_agree, accuracy = 0.1)` of songs. Cohen's Kappa was `r round(cohen_k$value, 3)` (p `r ifelse(cohen_k$p.value < 0.001, "< 0.001", paste("=", round(cohen_k$p.value, 4)))`). Fleiss' Kappa was `r round(fleiss_k_human$value, 3)`. Krippendorff's Alpha was `r round(kripp_human$est[["coeff.val"]], 3)` `r kripp_human$est[["conf.int"]]`.
 
 ```{r}
 #| label: tbl-confusion-human
-#| tbl-cap: "Confusion matrix: Coder A vs Coder B"
+#| tbl-cap: "Confusion matrix: Coder B vs Coder A"
 human_coding_wide |>
-  count(is_political_coder_a, is_political_coder_b) |>
-  pivot_wider(names_from = is_political_coder_b, values_from = n, names_prefix = "coder_b_") |>
-  knitr::kable(col.names = c("Coder A", "Coder B: Not political", "Coder B: Political"))
+  count(is_political_coder_b, is_political_coder_a) |>
+  pivot_wider(names_from = is_political_coder_a, values_from = n, names_prefix = "coder_a_") |>
+  knitr::kable(col.names = c("Coder B", "Coder A: Not political", "Coder A: Political"))
 ```
 
 ## Human vs LLM Agreement
@@ -75,7 +75,7 @@ We now treat each human coder as an additional rater alongside the `r nrow(model
 
 ```{r}
 agreement_matrix <- human_llm_wide |>
-  select(is_political_coder_a, is_political_coder_b, starts_with("about_politics")) |>
+  select(is_political_coder_b, is_political_coder_a, starts_with("about_politics")) |>
   mutate(across(everything(), as.numeric))
 
 fleiss_k_all <- irr::kappam.fleiss(agreement_matrix)
@@ -160,8 +160,8 @@ n_models <- nrow(models_df)
 disagreement_data <- human_llm_wide |>
   mutate(
     human_consensus = case_when(
-      is_political_coder_a == 1 & is_political_coder_b == 1 ~ "Both political",
-      is_political_coder_a == 0 & is_political_coder_b == 0 ~ "Both not political",
+      is_political_coder_b == 1 & is_political_coder_a == 1 ~ "Both political",
+      is_political_coder_b == 0 & is_political_coder_a == 0 ~ "Both not political",
       TRUE ~ "Disagree"
     ),
     llm_political_count = rowSums(across(starts_with("about_politics")), na.rm = TRUE),
@@ -250,8 +250,8 @@ lyrics_h <- combined_responses_wide_politics_simple |>
 
 justifications_h |>
   left_join(lyrics_h, by = "prompt_digest") |>
-  select(song, artist, justification_coder_a, justification_coder_b, lyrics) |>
-  knitr::kable(col.names = c("Song", "Artist", "Coder A justification (excerpt)", "Coder B justification (excerpt)", "Lyrics (truncated)"))
+  select(song, artist, justification_coder_b, justification_coder_a, lyrics) |>
+  knitr::kable(col.names = c("Song", "Artist", "Coder B justification (excerpt)", "Coder A justification (excerpt)", "Lyrics (truncated)"))
 ```
 
 Songs where both human coders agree the song is not political but LLM majority classifies it as political:
@@ -287,8 +287,8 @@ lyrics_col <- combined_responses_wide_politics_simple |>
 
 justifications |>
   left_join(lyrics_col, by = "prompt_digest") |>
-  select(song, artist, justification_coder_a, justification_coder_b, lyrics) |>
-  knitr::kable(col.names = c("Song", "Artist", "Coder A justification (excerpt)", "Coder B justification (excerpt)", "Lyrics (truncated)"))
+  select(song, artist, justification_coder_b, justification_coder_a, lyrics) |>
+  knitr::kable(col.names = c("Song", "Artist", "Coder B justification (excerpt)", "Coder A justification (excerpt)", "Lyrics (truncated)"))
 ```
 
 ## Confidence Analysis
@@ -330,7 +330,7 @@ human_coding_raw |>
 #| label: fig-yearly-human-llm
 #| fig-cap: "Proportion of songs classified as political, by rater and year (validation sample only)"
 human_llm_long |>
-  mutate(source = ifelse(model %in% c("coder_a", "coder_b"), "Human", "LLM")) |>
+  mutate(source = ifelse(model %in% c("coder_b", "coder_a"), "Human", "LLM")) |>
   group_by(year, model, source) |>
   summarise(avg = mean(about_politics, na.rm = TRUE), .groups = "drop") |>
   ggplot(aes(x = year, y = avg, color = model, linetype = source)) +

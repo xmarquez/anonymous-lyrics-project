@@ -10,7 +10,7 @@ human_coding_pipeline <- list(
   tar_target(
     name = human_coding_raw,
     command = readr::read_csv(human_coding_export_file, show_col_types = FALSE) |>
-      dplyr::filter(coder_name %in% c("coder_a", "coder_b")),
+      dplyr::filter(coder_name %in% c("coder_b", "coder_a")),
     description = "Human coding: loaded and filtered to the two main anonymized coders"
   ),
 

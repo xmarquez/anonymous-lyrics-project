@@ -57,14 +57,7 @@ list(
   ),
   tar_target(
     name = model_pricing,
-    command = tibble::tribble(
-      ~model, ~input_per_m, ~output_per_m, ~cached_input_per_m, ~batch_discount_factor, ~cache_discounts_with_batch,
-      "openai/gpt-oss-20b", 0.075, 0.30, 0.037, 0.5, FALSE,
-      "openai/gpt-oss-120b", 0.15, 0.60, 0.075, 0.5, FALSE,
-      "moonshotai/kimi-k2-instruct-0905", 1.00, 3.00, 0.50, 0.5, FALSE,
-      "meta-llama/llama-4-scout-17b-16e-instruct", 0.11, 0.34, NA_real_, 0.5, FALSE,
-      "gemini-3-flash-preview", 0.50, 3.00, 0.05, 0.5, NA
-    ),
+    command = model_pricing_table(),
     description = "Pricing: per-1M token rates and discount rules for models missing cost data"
   ),
   tar_file_read(

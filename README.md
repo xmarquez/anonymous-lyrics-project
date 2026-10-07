@@ -59,7 +59,7 @@ Public derived-data bundle (`data-derived/public/`). Every object is provided as
 | stem | contents | used for |
 |:---|:---|:---|
 | `human_coding_public` | Anonymized human classifications and justifications | Human-validation tables and appendix figures |
-| `llm_politics_simple_public` | Song-model political-content classifications and justifications, without full lyrics | Main Figures 2-6 and appendix LLM/human-validation figures |
+| `llm_politics_simple_public` | Song-model political-content classifications, justifications, and per-response token usage and cost, without full lyrics | Main Figures 2-6, appendix LLM/human-validation figures, and Table E1 |
 | `llm_politics_themes_public` | Song-model political-theme classifications in long form | Theme tables and appendix theme figures |
 | `politics_categories_public` | Theme-category lookup table | Theme tables |
 | `politics_categories_human_public` | Human-justification category lookup table | Human-validation appendix outputs |
@@ -210,6 +210,7 @@ Manuscript tables and figures, with the report chunk that produces each one and 
 | Table 6 (theme categories) | `llm_classification.qmd` (`tbl-theme-categories`) | `tables/table_6_theme_categories.csv` |
 | Table 7 (inter-model theme agreement) | `llm_classification.qmd` (`tbl-correlations`) | `tables/table_7_theme_agreement.csv` |
 | Table 8 (LLM vs human agreement) | `human_classification.qmd` (`tbl-per-model-kappa`) | `tables/table_8_human_model_agreement.csv` |
+| Table E1 (token usage and estimated costs, supplementary material) | `llm_classification.qmd` (`tbl-politics-simple-costs`) | `tables/appendix_table_e1_llm_costs.csv` |
 | Supplementary figures and tables | remaining `fig-` and `tbl-` labels in the three reports | `figures/appendix_*.png`, `tables/appendix_*.csv` |
 
 Other programs and outputs:
