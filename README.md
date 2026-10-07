@@ -121,7 +121,7 @@ The full `{targets}` pipeline reported the following storage use:
 ## Runtime
 
 - Public replay (`run_public.R`): under one minute.
-- Frozen run (`run_frozen.R`): 30-45 minutes on the machine above, mostly fitting the STM (`stm_fit`, about 25 minutes) and rendering the reports.
+- Frozen run (`run_frozen.R`): 30-45 minutes on the machine above, mostly fitting the STM (`stm_fit`, about 25 minutes) and rendering the reports; about 16 minutes in the Docker image on the same machine.
 - Full live run: about one week. Recorded runtimes for the most expensive targets in the original run (branch times summed) were:
 
 | target | duration |
@@ -140,7 +140,7 @@ Summed branch times overstate active computation for the LLM targets (batch jobs
 - `_targets.R`: main pipeline definition.
 - `R/`: pipeline functions and helpers, including scraping, prompt construction, LLM calls, human-coding validation, and analysis sub-pipelines.
 - `_targets.yaml`: defines two `{targets}` projects, `main` (live run, store `_targets/`) and `frozen` (store `_targets_frozen/`).
-- `R/frozen_targets.R`: in the `frozen` project, replaces each scraping, LLM, and `stm::searchK()` target with a target that reads the corresponding file in `data-frozen/`; all other targets are identical in both modes.
+- `R/frozen_targets.R`: in the `frozen` project, replaces each scraping, LLM, and `stm::searchK()` target, and the STM text preprocessing, with a target that reads the corresponding file in `data-frozen/`; all other targets are identical in both modes.
 - `run.sh`: master non-interactive script for the full live run.
 - `run.R`: interactive runner.
 - `run_frozen.R`: runs the pipeline from frozen inputs (requires the privately shared `data-frozen/`).

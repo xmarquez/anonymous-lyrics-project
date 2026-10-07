@@ -4,8 +4,8 @@
 #
 # Writes one xz-compressed RDS per target in FROZEN_TARGETS to data-frozen/, plus a snapshot of
 # the original run's metadata (original_run_meta.rds) and a manifest. The frozen pipeline
-# (TAR_PROJECT=frozen) reads these files instead of scraping Genius, calling LLM APIs, or running
-# stm::searchK().
+# (TAR_PROJECT=frozen) reads these files instead of scraping Genius, calling LLM APIs, running
+# stm::searchK(), or preprocessing the STM corpus (whose tokenization differs across platforms).
 #
 # data-frozen/ contains full copyrighted lyrics: share it only privately with editors and the
 # replication team, never in the public or anonymous repository.

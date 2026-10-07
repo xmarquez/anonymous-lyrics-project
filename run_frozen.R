@@ -4,8 +4,8 @@
 #
 # Rebuilds every downstream target (prompt construction, response processing, STM fit and effects,
 # Empath, human-coding validation, cost summaries, and the three Quarto reports) from the outputs of
-# the authors' original scraping and LLM runs stored in data-frozen/. No API keys are needed and no
-# external services are called. Results go to a separate store, _targets_frozen/.
+# the authors' original scraping, LLM, and STM-preprocessing runs stored in data-frozen/. No API keys are
+# needed and no external services are called. Results go to a separate store, _targets_frozen/.
 #
 # Usage:
 #   Rscript run_frozen.R
