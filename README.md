@@ -220,6 +220,10 @@ Other programs and outputs:
 | Pipeline objects | `_targets.R` | `_targets/` (live run) or `_targets_frozen/` (frozen run) |
 | Variable codebook | `codebook.qmd` | `codebook.md` (re-render with `quarto render codebook.qmd --to gfm`) |
 
+# AI assistance
+
+The authors made use of OpenAI's GPT-5.2-Codex, GPT 5.5, and Anthropic's Claude Sonnet 4.5, Opus 4.6, and Opus 5.5 to assist with writing and reviewing the code for lyric scraping, analysis, human-coding validation, and the replication materials. These tools were accessed through OpenAI's Codex and Anthropic's Claude Code between December 2025 and October 2026. The large language models used to measure political content are described in the Methods and in Appendix E.
+
 # References
 
 ## Data sources
