@@ -75,7 +75,7 @@ list(
   ),
 
   # ---- Sample runs and exports
-  tar_target(
+  tar_frozen(tar_target(
     name = politics_simple_responses_sample,
     command = run_ellmer_chat(
       politics_simple_prompts_sample$prompt, 
@@ -87,8 +87,8 @@ list(
       left_join(models_df, by = join_by(model)),
     pattern = map(politics_simple_prompts_sample),
     description = "Sample: LLM responses for simple politics prompt"
-  ),
-  tar_target(
+  )),
+  tar_frozen(tar_target(
     name = politics_themes_responses_sample,
     command = run_ellmer_chat(
       politics_themes_prompts_sample$prompt,
@@ -100,7 +100,7 @@ list(
       left_join(models_df, by = join_by(model)),
     pattern = map(politics_themes_prompts_sample),
     description = "Sample: LLM responses for politics themes prompt"
-  ),
+  )),
   tar_target(
     name = export_politics_simple_responses_sample,
     command = write_csv(politics_simple_responses_sample, here::here("politics_simple_responses_sample.csv")),
@@ -108,7 +108,7 @@ list(
   ),
 
   # ---- Simple politics classification
-  tar_target(
+  tar_frozen(tar_target(
     name = combined_responses_politics_simple,
     command = run_ellmer_chat(
       politics_simple_prompts_full$prompt, 
@@ -121,7 +121,7 @@ list(
     pattern = map(politics_simple_prompts_full),
     error = "null",
     description = "LLM responses: full simple politics classifications"
-  ),
+  )),
   tar_target(
     name = combined_responses_politics_simple_enriched,
     command = left_join(
@@ -214,7 +214,7 @@ list(
   ),
 
   # ---- Category extraction
-  tar_target(
+  tar_frozen(tar_target(
     name = politics_categories,
     command = {
       chat <- ellmer::chat_openai(model = "gpt-5.2", params = ellmer::params(reasoning_effort = "high"))
@@ -223,8 +223,8 @@ list(
       tibble(category = paste("Category", seq_along(res)), description = res)
     },
     description = "Categories: extracted themes from model justifications"
-  ),
-  tar_target(
+  )),
+  tar_frozen(tar_target(
     name = politics_categories_human,
     command = {
       justifications_text <- human_coding_raw |>
@@ -242,10 +242,10 @@ list(
       tibble(category = paste("Category", seq_along(res)), description = res)
     },
     description = "Categories: extracted themes from human coder justifications"
-  ),
+  )),
 
   # ---- Politics themes classification
-  tar_target(
+  tar_frozen(tar_target(
     name = combined_responses_politics_themes,
     command = run_ellmer_chat(
       politics_themes_prompts_full$prompt, 
@@ -258,7 +258,7 @@ list(
     pattern = map(politics_themes_prompts_full),
     error = "null",
     description = "LLM responses: themes extracted for political songs"
-  ),
+  )),
   tar_target(
     name = combined_responses_politics_themes_enriched,
     command = left_join(

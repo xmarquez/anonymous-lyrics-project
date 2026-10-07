@@ -41,7 +41,7 @@ stm_pipeline <- list(
     description = "STM: prepared documents, vocab, and metadata"
   ),
   # ---- Diagnostics
-  tar_target(
+  tar_frozen(tar_target(
     name = stm_search_k,
     command = stm::searchK(
       stm_prepped$documents,
@@ -53,7 +53,7 @@ stm_pipeline <- list(
       seed = 14850
     ),
     description = "STM: searchK diagnostics for choosing number of topics"
-  ),
+  )),
   # ---- Model fit and outputs
   tar_target(
     name = stm_fit,

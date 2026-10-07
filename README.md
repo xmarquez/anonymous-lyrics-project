@@ -1,14 +1,20 @@
 # Overview
 
-This anonymous review repository contains replication materials for a study of political content in Billboard Hot 100 song lyrics. The analysis relies on a `{targets}` pipeline that scrapes and cleans song lyrics data, runs LLM classification for political content and related analyses, validates classifications against human coding, and produces the tables and figures reported in the manuscript.
+This anonymous review repository contains replication materials for *"'We Didn't Start the Fire'... But Can We Detect It? Measuring Political Content in Song Lyrics with LLMs"*, a study of political content in Billboard Hot 100 song lyrics (1958-2025). The analysis relies on a `{targets}` pipeline that scrapes song lyrics from Genius, classifies them for political content with nine LLMs, compares the LLMs with keyword search, a structural topic model (STM), Empath, and human coders, and produces the tables and figures reported in the manuscript.
 
-This repository contains sanitized derived data plus the full pipeline code; full lyrics and credentials are not included (see Statement about Rights). The default public reproduction path (`run_public.R`) replays manuscript outputs from `data-derived/public/` in minutes; the optional full pipeline (`run.sh`, optionally containerized via `DOCKER_SETUP.md`) regenerates everything from upstream sources.
+This repository contains the full pipeline code plus sanitized derived data; full lyrics and credentials are not included (see Statement about Rights). There are three ways to run the analysis:
+
+| Mode | Command | Requires | Runtime | Reproduces |
+|:---|:---|:---|:---|:---|
+| **Public replay (default for reviewers)** | `Rscript run_public.R` | Only this repository | under one minute | Manuscript figures and tables from `data-derived/public/` |
+| Frozen run | `Rscript run_frozen.R` | Frozen scraped lyrics and LLM outputs (`data-frozen/`), shared privately with the editors because the lyrics are copyrighted. No API keys | 30-45 minutes | Everything downstream of scraping and LLM calls, including STM, Empath, and the full reports |
+| Full live run | `./run.sh` | User-supplied API keys | about one week | Everything, including scraping and LLM calls |
 
 # Data Availability and Provenance Statements
 
 ## Summary
 
-- Source data include the Billboard Hot 100 list (`data-raw/hot100.csv`) and lyrics scraped using the Genius API.
+- Source data include the Billboard Hot 100 list from 1958-08-06 to 2025-10-22 (`data-raw/hot100.csv`) and lyrics scraped using the Genius API.
 - Access to Genius data requires a `GENIUS_API_TOKEN` and compliance with Genius terms.
 - A variable codebook is provided as `codebook.qmd` (source) and `codebook.md` (rendered for GitHub).
 - The public replication package includes sanitized derived data in `data-derived/public/` in both CSV and RDS form.
@@ -16,7 +22,8 @@ This repository contains sanitized derived data plus the full pipeline code; ful
 ## Statement about Rights
 
 - The full lyrics used in the analysis are copyrighted and are not redistributed here. This anonymous bundle omits full lyrics, full lyric-bearing prompt bodies, raw API request and response archives, and API keys; it includes sanitized derived data, model classifications, and LLM free-text justifications (which may contain incidental lyric quotations).
-- Users who rerun the full private pipeline must supply their own credentials and are responsible for complying with the applicable terms for the underlying data sources and API providers.
+- The scraped lyrics and raw LLM outputs used in the manuscript are shared privately with the journal's editors and replication team as frozen intermediate objects, which allow the full analysis to be rerun without scraping or API calls (`run_frozen.R`). They are not part of this public repository.
+- Users who rerun the full live pipeline must supply their own credentials and are responsible for complying with the applicable terms for the underlying data sources and API providers. Since public APIs change and models get deprecated, there is no guarantee that a full scrape and classification can be replicated exactly using this pipeline.
 
 ## Summary of Availability
 
@@ -32,7 +39,7 @@ The basic source list consists of Billboard Hot 100 songs. The list was obtained
 
 The lyrics of most songs are scraped via the Genius API. The scraping code is primarily in `R/genius_api.R` and runs as part of the larger `{targets}` pipeline in `R/scraping_pipeline.R`. A fuller description of the lyric-processing workflow is in `llm_classification.qmd`.
 
-Intermediate and final analytical objects are produced by the `{targets}` pipeline. For the anonymous public package, the intended reproducible path distributes sanitized derived objects in `data-derived/public/` rather than full copyrighted lyrics or raw provider archives.
+Intermediate and final analytical objects are produced by the `{targets}` pipeline. For the anonymous public package, the reproducible path distributes sanitized derived objects in `data-derived/public/`.
 
 # Dataset list
 
@@ -42,6 +49,9 @@ Inputs and source data:
 |:---|:---|:---|:---|
 | `data-raw/hot100.csv` | Billboard Hot 100 source list | Input list of songs | Yes |
 | `data-raw/known_politics_songs.csv` | Curated validation list | Known political songs used for validation | Yes |
+| `empath/input/politics_keywords.csv` | Authors | Seed words for the custom Empath politics categories | Yes |
+| `human-coding/exports/political_coding_export_20260304_221106.csv` | Human coders | Classifications, confidence, and justifications for 600 songs by two coders (anonymized as Coder A and Coder B); no lyrics | Yes |
+| `human-coding/coding_instructions.md` | Authors | Instructions given to the human coders | Yes |
 | N/A - produced during a full run | Genius API | Lyrics scraped by the pipeline | Code provided to rerun; lyrics not redistributed |
 
 Public derived-data bundle (`data-derived/public/`). Every object is provided as both `.csv` and `.rds`; `manifest.csv` is the machine-readable inventory.
@@ -93,7 +103,7 @@ The full pipeline was run on a machine with the following specifications:
 - Disk: approximately 819 GB in the working partition, with approximately 119 GB free at testing time
 - GPU: NVIDIA RTX PRO 500 Blackwell Generation Laptop GPU and Intel Arc Pro 140T
 
-GPU inference is not required for the public derived-data run, but it speeds local inference for Ollama-based models in a full private run.
+GPU inference is not required for the public derived-data run, but it speeds local inference for Ollama-based models in a full live run.
 
 ## Storage Requirements
 
@@ -108,40 +118,34 @@ The full `{targets}` pipeline reported the following storage use:
 | stem | 683 MB |
 | total | 724 MB |
 
-## Runtime (from targets metadata)
+## Runtime
 
-The full pipeline is computationally expensive because it includes scraping, LLM calls, and topic-model fitting. Representative recorded runtimes include:
+- Public replay (`run_public.R`): under one minute.
+- Frozen run (`run_frozen.R`): 30-45 minutes on the machine above, mostly fitting the STM (`stm_fit`, about 25 minutes) and rendering the reports.
+- Full live run: about one week. Recorded runtimes for the most expensive targets in the original run (branch times summed) were:
 
-| target_or_pattern | duration |
+| target | duration |
 |:---|---:|
-| `hot100_genius_sample` | 374.859s (about 6.25 minutes) |
-| `hot100_genius_full` | 11932.751s (about 3.31 hours) |
-| `combined_responses_politics_simple` | 12384.145s (about 3.44 hours) |
-| `politics_simple_responses_sample` | 2.703s |
-| `politics_themes_responses_sample` | 1701.454s (about 28.36 minutes) |
-| `stm_search_k` | 12322.203s (about 3.42 hours) |
-| `stm_fit` | 1644.437s (about 27.41 minutes) |
+| `hot100_genius_full` | about 1.5 days |
+| `combined_responses_politics_simple` | about 5.5 days |
+| `combined_responses_politics_themes` | about 1.8 hours |
+| `stm_search_k` | about 3.4 hours |
+| `stm_fit` | about 27 minutes |
+| `stm_effects`, `empath_analysis`, GPT-5.2 category extraction | about 1 minute each or less |
 
-Recorded aggregate runtime metadata:
-
-| type | duration |
-|:---|---:|
-| branch | 586875.282s (about 6.79 days) |
-| function | 0s |
-| object | 0s |
-| pattern | 26395.912s (about 7.33 hours) |
-| stem | 14371.433s (about 3.99 hours) |
-| total | 627642.627s (about 1.04 weeks) |
-
-Pattern durations are not the same as elapsed wall-clock time for a fresh run, and totals may be inflated where pattern timings already include branch work. Actual runtime varies with batch processing, parallel workers, provider limits, and restarts. Overall, a full run should take about a week.
+Summed branch times overstate active computation for the LLM targets (batch jobs can wait up to 24 hours) and understate elapsed time across restarts. Actual runtime varies with batch processing, parallel workers, provider limits, and restarts.
 
 # Description of programs/code
 
 - `_targets.R`: main pipeline definition.
 - `R/`: pipeline functions and helpers, including scraping, prompt construction, LLM calls, human-coding validation, and analysis sub-pipelines.
-- `run.sh`: master non-interactive replication script.
+- `_targets.yaml`: defines two `{targets}` projects, `main` (live run, store `_targets/`) and `frozen` (store `_targets_frozen/`).
+- `R/frozen_targets.R`: in the `frozen` project, replaces each scraping, LLM, and `stm::searchK()` target with a target that reads the corresponding file in `data-frozen/`; all other targets are identical in both modes.
+- `run.sh`: master non-interactive script for the full live run.
 - `run.R`: interactive runner.
+- `run_frozen.R`: runs the pipeline from frozen inputs (requires the privately shared `data-frozen/`).
 - `run_public.R`: short public reproduction entry point using only `data-derived/public/`.
+- `scripts/export_frozen_inputs.R`: writes `data-frozen/` from a completed live run.
 - `scripts/export_public_replication_data.R`: converts a completed full-pipeline targets cache into the sanitized public bundle in `data-derived/public/`.
 - `scripts/render_public_manuscript_outputs.R`: recreates the current manuscript and appendix outputs from public derived data.
 - `config/models.yml`: model configuration, including providers, processing modes, batch sizes, and explicit model parameters.
@@ -165,39 +169,55 @@ Rscript -e "renv::restore()"
 Rscript run_public.R
 ```
 
-This writes figure files to `results/public/figures/` and table files to `results/public/tables/`, including Appendix Tables D1-D2.
+This writes figure files to `results/public/figures/` and table files to `results/public/tables/`, including Appendix Tables D1-D2. It takes under a minute after packages are installed.
 
-## Optional Full Private Pipeline
+## Frozen Run (editors and replication team)
+
+With the privately shared `data-frozen/` folder placed in the repository root, and Python set up for Empath (`requirements-empath.txt`, in `.venv/empath` or via `RETICULATE_PYTHON`), run:
+
+```bash
+Rscript run_frozen.R
+```
+
+This rebuilds every target downstream of scraping and LLM calls into `_targets_frozen/` and renders the three reports. No API keys are needed.
+
+## Optional Full Live Pipeline
 
 1. Copy `.Renviron.example` to `.Renviron`.
 2. Fill in local credentials for the required services.
 3. Run `./run.sh` for a local `renv`-based run.
 4. Alternatively, run `USE_DOCKER=1 ./run.sh` to execute inside Docker.
 
-The full private pipeline reruns scraping and model calls and therefore requires user-supplied API keys plus access to the underlying services. See `DOCKER_SETUP.md` for Docker-specific setup and troubleshooting.
-
-## Sanitized Bundle vs. Full Regeneration
-
-`run_public.R` is a replay path. It does not regenerate tables and figures from scratch, but treats the files in `data-derived/public/` as fixed inputs and reproduces the manuscript-facing outputs from those sanitized inputs. In particular, it does not scrape lyrics, reconstruct omitted lyric text, rebuild full prompt bodies, call API providers, or run computationally intensive models (like the Structural Topic model or Empath analysis reported in the paper).
-
-The sanitized bundle was produced from a completed full targets run using:
-
-```bash
-Rscript scripts/export_public_replication_data.R
-```
-
-Recreating that bundle from upstream sources would therefore require the optional full private pipeline first: obtaining lyrics through the Genius API, rerunning the LLM classifications and related analyses (including the STM model and Empath analysis), creating the full private targets cache, and then exporting the shareable subset with `scripts/export_public_replication_data.R`.
+The full live pipeline reruns scraping and model calls and therefore requires user-supplied API keys plus access to the underlying services. See `DOCKER_SETUP.md` for Docker-specific setup and troubleshooting.
 
 # List of tables and programs
 
-| manuscript_item | program_or_file | output_or_label | notes |
-|:---|:---|:---|:---|
-| Figures and tables in `llm_classification.qmd` | `llm_classification.qmd` | `fig-match-by-match-score`, `fig-match-proportions-by-match-score`, `tbl-example-of-match-discrepancies`, `tbl-models`, `tbl-politics-simple-costs`, `tbl-politics-categories`, `tbl-simple-results`, `fig-yearly`, `fig-corr`, `fig-disc`, `tbl-known-politics`, `tbl-imagine`, `tbl-johnny-cash`, `tbl-politics-only-one-model`, `fig-confidence-by-model`, `fig-confidence-political`, `fig-confidence-weighted`, `tbl-confidence-scores`, `fig-density-politics-per-year`, `fig-popularity`, `tbl-theme-categories`, `fig-theme-distribution-per-model`, `fig-theme-distribution`, `fig-theme-distribution-per-model-ridges`, `tbl-correlations` | See labels in source file |
-| Figures and tables in `analysis_replication.qmd` | `analysis_replication.qmd` | `fig-missing-lyrics`, `fig-keyword-politics`, `fig-keyword-war-countries`, `tbl-stm-topics`, `fig-stm-violence`, `fig-empath-over-time`, `tbl-empath-top-songs`, `tbl-empath-top-songs-expanded`, `tbl-empath-known-songs` | See labels in source file |
-| Human-coding validation outputs | `human_classification.qmd` | Human-coder comparison tables and figures | See labels in source file |
-| Public derived-data reproduction | `run_public.R`, `scripts/render_public_manuscript_outputs.R` | `results/public/figures/`, `results/public/tables/` | Uses only sanitized public data; reproduces current manuscript and appendix outputs, including Appendix Tables D1-D2 |
-| Pipeline outputs | `_targets.R` | Targets cache in `_targets/` | Generated at runtime |
-| Variable codebook | `codebook.qmd` | `codebook.md` | Pre-rendered GitHub-flavored markdown; re-render with `quarto render codebook.qmd --to gfm` |
+Manuscript tables and figures, with the report chunk that produces each one and the corresponding file written by the public replay (`results/public/`):
+
+| Manuscript item | Report (label) | Public replay output |
+|:---|:---|:---|
+| Table 1 (performance expectations) | none (conceptual table) | |
+| Figure 1 (political keyword search) | `analysis_replication.qmd` (`fig-keyword-politics`) | `figures/figure_1_keyword_politics.png` |
+| Table 2 (STM topic words) | `analysis_replication.qmd` (`tbl-stm-topics`) | `tables/table_2_stm_topic_terms.csv` |
+| Table 3 (Empath top songs) | `analysis_replication.qmd` (`tbl-empath-top-songs`) | `tables/table_3_empath_top_songs.csv` |
+| Table 4 (Empath known political songs) | `analysis_replication.qmd` (`tbl-empath-known-songs`) | `tables/table_4_empath_known_songs.csv` |
+| Table 5 (songs about politics) | `llm_classification.qmd` (`tbl-simple-results`) | `tables/table_5_songs_about_politics.csv` |
+| Figure 2 (political songs per model and year) | `llm_classification.qmd` (`fig-yearly`) | `figures/figure_2_yearly_politics_by_model.png` |
+| Figure 3 (correlations between models) | `llm_classification.qmd` (`fig-corr`) | `figures/figure_3_model_correlations.png` |
+| Figure 4 (average confidence by model) | `llm_classification.qmd` (`fig-confidence-by-model`) | `figures/figure_4_average_confidence_by_model.png` |
+| Figure 5 (confidence by model agreement) | `llm_classification.qmd` (`fig-confidence-political`) | `figures/figure_5_confidence_by_agreement.png` |
+| Figure 6 (confidence-weighted political content) | `llm_classification.qmd` (`fig-confidence-weighted`) | `figures/figure_6_confidence_weighted_politics.png` |
+| Table 6 (theme categories) | `llm_classification.qmd` (`tbl-theme-categories`) | `tables/table_6_theme_categories.csv` |
+| Table 7 (inter-model theme agreement) | `llm_classification.qmd` (`tbl-correlations`) | `tables/table_7_theme_agreement.csv` |
+| Table 8 (LLM vs human agreement) | `human_classification.qmd` (`tbl-per-model-kappa`) | `tables/table_8_human_model_agreement.csv` |
+| Supplementary figures and tables | remaining `fig-` and `tbl-` labels in the three reports | `figures/appendix_*.png`, `tables/appendix_*.csv` |
+
+Other programs and outputs:
+
+| Item | Program | Output |
+|:---|:---|:---|
+| Pipeline objects | `_targets.R` | `_targets/` (live run) or `_targets_frozen/` (frozen run) |
+| Variable codebook | `codebook.qmd` | `codebook.md` (re-render with `quarto render codebook.qmd --to gfm`) |
 
 # References
 

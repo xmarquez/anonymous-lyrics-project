@@ -41,7 +41,7 @@ scraping <- list(
     deployment = "main",
     description = "Scraping: batched sample of Hot 100 Billboard chart for testing"
   ),
-  tar_target(
+  tar_frozen(tar_target(
     name = hot100_genius_sample,
     command = hot100_sample |>
       mutate(genius = purrr::map2(artist, song, \(artist, song) {
@@ -57,7 +57,7 @@ scraping <- list(
     pattern = map(hot100_sample),
     deployment = "main",
     description = "Scraping: scrape lyrics from batched sample of Hot 100 Billboard chart for testing"
-  ),
+  )),
   # ---- Full scrape
   tar_group_by(
     name = hot100_full,
@@ -67,7 +67,7 @@ scraping <- list(
     deployment = "main",
     description = "Scraping: batched Hot 100 Billboard chart for scraping"
   ),
-  tar_target(
+  tar_frozen(tar_target(
     name = hot100_genius_full,
     command = hot100_full |>
       mutate(genius = purrr::map2(artist, song, \(artist, song) {
@@ -84,5 +84,5 @@ scraping <- list(
     deployment = "main",
     error = "null",
     description = "Scraping: scrape lyrics from batched Hot 100 Billboard chart"
-  )
+  ))
 )

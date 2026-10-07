@@ -20,7 +20,8 @@ if [[ -n "$TARGETS" ]]; then
 fi
 
 if [[ ! -f .Renviron ]]; then
-  echo "Missing .Renviron. Copy .Renviron.example to .Renviron and add API keys."
+  echo "Missing .Renviron. The full live run needs API keys: copy .Renviron.example to .Renviron and add them."
+  echo "To run without API keys, use: Rscript run_frozen.R (needs data-frozen/) or Rscript run_public.R (public replay)."
   exit 1
 fi
 

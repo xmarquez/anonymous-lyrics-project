@@ -41,7 +41,7 @@ lyrics_matched <- lyrics_all |>
 
 ```{r}
 #| label: fig-missing-lyrics
-#| fig-cap: "Missing song lyrics in Genius, by year (paper Figure 2)."
+#| fig-cap: "Missing song lyrics in Genius, by year (supplementary material)."
 
 missing_by_year <- lyrics_all |>
   group_by(year) |>
@@ -57,7 +57,7 @@ ggplot(missing_by_year, aes(x = year, y = missing)) +
 
 ```{r}
 #| label: fig-keyword-politics
-#| fig-cap: "Political keyword search results (paper Figure 3)."
+#| fig-cap: "Political keyword search results (manuscript Figure 1)."
 
 political_terms <- tibble::tribble(
   ~label, ~pattern,
@@ -89,7 +89,7 @@ ggplot(political_series, aes(x = year, y = prop)) +
 
 ```{r}
 #| label: fig-keyword-war-countries
-#| fig-cap: "Country keyword search results (paper Figure 4)."
+#| fig-cap: "Country keyword search results (supplementary material)."
 
 war_terms <- tibble::tribble(
   ~label, ~pattern,
@@ -121,7 +121,7 @@ ggplot(war_series, aes(x = year, y = prop)) +
 
 ```{r}
 #| label: tbl-stm-topics
-#| tbl-cap: "Highest probability words from the STM topics (paper Table 1)."
+#| tbl-cap: "Highest probability words from the STM topics (manuscript Table 2)."
 
 if ("stm_topic_labels" %in% targets::tar_meta()$name) {
   tar_load(stm_topic_labels)
@@ -145,7 +145,7 @@ if ("stm_topic_labels" %in% targets::tar_meta()$name) {
 
 ```{r}
 #| label: fig-stm-violence
-#| fig-cap: "STM conflict and violence topics over time (paper Figure 5)."
+#| fig-cap: "STM conflict and violence topics over time (supplementary material)."
 
 if (all(c("stm_effects", "stm_topic_labels") %in% targets::tar_meta()$name)) {
   tar_load(stm_effects)
@@ -204,7 +204,7 @@ if (all(c("stm_effects", "stm_topic_labels") %in% targets::tar_meta()$name)) {
 
 ```{r}
 #| label: fig-empath-over-time
-#| fig-cap: "Empath results over time (paper Figure 6)."
+#| fig-cap: "Empath results over time (supplementary material)."
 
 if ("empath_results" %in% targets::tar_meta()$name) {
   tar_load(empath_results)
@@ -238,7 +238,7 @@ ggplot(empath_long, aes(x = year, y = n)) +
 
 ```{r}
 #| label: tbl-empath-top-songs
-#| tbl-cap: "Empath results for top songs (paper Table 2)."
+#| tbl-cap: "Empath results for top songs (manuscript Table 3)."
 
 if ("empath_results" %in% targets::tar_meta()$name) {
   tar_load(empath_results)
@@ -293,7 +293,7 @@ if ("empath_results" %in% targets::tar_meta()$name) {
 
 ```{r}
 #| label: tbl-empath-top-songs-expanded
-#| tbl-cap: "Empath results for expanded politics measures (paper Table 3)."
+#| tbl-cap: "Empath results for expanded politics measures (supplementary material)."
 
 if ("empath_results" %in% targets::tar_meta()$name) {
   tar_load(empath_results)
@@ -350,7 +350,7 @@ if ("empath_results" %in% targets::tar_meta()$name) {
 
 ```{r}
 #| label: tbl-empath-known-songs
-#| tbl-cap: "Empath scores for known political songs (paper Table 4)."
+#| tbl-cap: "Empath scores for known political songs (manuscript Table 4)."
 
 if ("empath_results" %in% targets::tar_meta()$name) {
   tar_load(empath_results)

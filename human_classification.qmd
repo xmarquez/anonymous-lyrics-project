@@ -222,7 +222,7 @@ disagreement_data |>
   knitr::kable()
 ```
 
-@tbl-human-political-llm-not-justifications shows the human justifications for a sample of these songs. Note that coders sometimes justified their classifications by quoting relevant lyrics excerpts rather than writing original explanations.
+@tbl-human-political-llm-not-justifications shows the human justifications for a sample of these songs. Note that coders typically justified their classifications by quoting relevant lyrics excerpts rather than writing original explanations.
 
 ```{r}
 #| label: tbl-human-political-llm-not-justifications
@@ -243,9 +243,15 @@ justifications_h <- human_coding_raw |>
   select(prompt_digest, song, artist, coder_name, justification) |>
   pivot_wider(names_from = coder_name, values_from = justification, names_prefix = "justification_")
 
+lyrics_h <- combined_responses_wide_politics_simple |>
+  filter(prompt_digest %in% political_by_humans_only$prompt_digest) |>
+  select(prompt_digest, lyrics) |>
+  mutate(lyrics = sanitize_for_table(lyrics) |> str_trunc(300))
+
 justifications_h |>
-  select(song, artist, justification_coder_a, justification_coder_b) |>
-  knitr::kable(col.names = c("Song", "Artist", "Coder A justification (excerpt)", "Coder B justification (excerpt)"))
+  left_join(lyrics_h, by = "prompt_digest") |>
+  select(song, artist, justification_coder_a, justification_coder_b, lyrics) |>
+  knitr::kable(col.names = c("Song", "Artist", "Coder A justification (excerpt)", "Coder B justification (excerpt)", "Lyrics (truncated)"))
 ```
 
 Songs where both human coders agree the song is not political but LLM majority classifies it as political:
@@ -260,7 +266,7 @@ disagreement_data |>
   knitr::kable()
 ```
 
-These two songs have political references that the human coders may have missed: one is about Eva Peron, the other about the assassination of JFK. @tbl-human-not-llm-justifications shows the human justifications.
+These two songs have political references that the human coders may have missed: one is about Eva Perón (don't cry for me Argentina), the other about the assassination of JFK. @tbl-human-not-llm-justifications shows the human justifications alongside the song lyrics.
 
 ```{r}
 #| label: tbl-human-not-llm-justifications
@@ -274,9 +280,15 @@ justifications <- human_coding_raw |>
   select(prompt_digest, song, artist, coder_name, justification) |>
   pivot_wider(names_from = coder_name, values_from = justification, names_prefix = "justification_")
 
+lyrics_col <- combined_responses_wide_politics_simple |>
+  filter(prompt_digest %in% not_political_by_humans$prompt_digest) |>
+  select(prompt_digest, lyrics) |>
+  mutate(lyrics = sanitize_for_table(lyrics) |> str_trunc(300))
+
 justifications |>
-  select(song, artist, justification_coder_a, justification_coder_b) |>
-  knitr::kable(col.names = c("Song", "Artist", "Coder A justification (excerpt)", "Coder B justification (excerpt)"))
+  left_join(lyrics_col, by = "prompt_digest") |>
+  select(song, artist, justification_coder_a, justification_coder_b, lyrics) |>
+  knitr::kable(col.names = c("Song", "Artist", "Coder A justification (excerpt)", "Coder B justification (excerpt)", "Lyrics (truncated)"))
 ```
 
 ## Confidence Analysis

@@ -35,7 +35,8 @@ tar_load(known_politics)
 tar_load(models_df)
 tar_load(clear_politics_songs)
 tar_load(politics_simple_prompts_full_raw)
-meta <- tar_meta()
+source(here::here("R", "frozen_targets.R"))
+meta <- pipeline_meta()
 
 known_politics <- readr::read_csv(
   here::here("data-raw", "known_politics_songs.csv"),

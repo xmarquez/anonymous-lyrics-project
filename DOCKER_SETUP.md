@@ -1,6 +1,6 @@
 # Docker Setup for Reproducible Lyrics Analysis
 
-This document describes Docker-based execution for the anonymous replication package. Docker is most useful for the optional full private pipeline, which requires API credentials and reruns scraping and LLM calls.
+This document describes Docker-based execution for the replication package. Docker is most useful for the optional full live pipeline, which requires API credentials and reruns scraping and LLM calls. The public replay (`run_public.R`) and the frozen run (`run_frozen.R`) can also be run inside the container.
 
 ## Included Files
 
@@ -14,7 +14,7 @@ This document describes Docker-based execution for the anonymous replication pac
 ## Prerequisites
 
 - Docker Desktop or another recent Docker installation with Docker Compose.
-- Local API credentials for services used by the full private pipeline.
+- Local API credentials for services used by the full live pipeline.
 
 ## Environment Setup
 
@@ -42,7 +42,7 @@ docker compose build lyrics-pipeline
 
 The image restores R packages from `renv.lock`, installs Quarto, and installs the Empath Python environment listed in `requirements-empath.txt`.
 
-## Run the Full Private Pipeline
+## Run the Full Live Pipeline
 
 Using the project wrapper:
 
