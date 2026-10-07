@@ -22,7 +22,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 # Get your key from: https://platform.openai.com/api-keys
 OPENAI_API_KEY=your_openai_api_key_here
 
-# Mistral API Key (for Mistral models via ellmer)
+# Mistral API Key (optional: Mistral models are disabled in config/models.yml)
 # Get your key from: https://console.mistral.ai/
 MISTRAL_API_KEY=your_mistral_api_key_here
 

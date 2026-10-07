@@ -78,7 +78,7 @@ Public derived-data bundle (`data-derived/public/`). Every object is provided as
 
 The full pipeline runs with the following software requirements:
 
-- R 4.5.x
+- R 4.5.x (the lockfile records R 4.5.1; the Docker image uses `rocker/verse:4.5.2`)
 - Python 3.10+ for Empath targets
 - Optional: Docker and Docker Compose
 - Optional: Ollama for local models such as `gemma3:4b`

@@ -98,10 +98,10 @@ If `renv::restore()` fails during a build, first verify that the lockfile restor
 Rscript -e "renv::restore(prompt = FALSE)"
 ```
 
-If API calls fail, verify that variables from `.Renviron` are visible inside the container:
+If API calls fail, check that variables from `.Renviron` are visible inside the container:
 
 ```bash
-docker compose exec lyrics-pipeline Rscript -e "Sys.getenv('OPENAI_API_KEY')"
+docker compose exec lyrics-pipeline Rscript -e "nzchar(Sys.getenv('OPENAI_API_KEY'))"  # TRUE if set; does not print the key
 ```
 
 To inspect Docker disk use:
@@ -110,6 +110,14 @@ To inspect Docker disk use:
 docker system df
 ```
 
-## Public Review Mode
+## Runs Without API Keys
 
-The intended public review run is the shorter derived-data mode described in `README.md`. That mode should not require Docker credentials, API keys, or full lyrics once the public derived objects are finalized.
+The public replay and the frozen run need no credentials, and `.Renviron` is optional in `docker-compose.yml`
+(Docker Compose 2.24 or later):
+
+```bash
+docker compose run --rm lyrics-pipeline Rscript run_public.R
+docker compose run --rm lyrics-pipeline Rscript run_frozen.R   # requires data-frozen/ (private package)
+```
+
+The frozen run writes to `_targets_frozen/`, which persists in the mounted project directory.

@@ -20,7 +20,7 @@ tar_load(hot100_genius_full)
 
 # Overview
 
-This document reproduces the figures referenced in the AJPS manuscript using the current pipeline data. It mirrors the structure of the paper, with Quarto labels suitable for citation in text.
+This document reproduces the keyword, STM, and Empath figures and tables referenced in the manuscript using the current pipeline data. It mirrors the structure of the paper, with Quarto labels suitable for citation in text.
 
 Note: Figure 1 in the paper is a screenshot of a Billboard chart page and is not programmatically reproduced here.
 

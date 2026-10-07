@@ -21,7 +21,7 @@ if (!file.exists(".Renviron")) {
 
 # Verify critical API keys are set
 required_keys <- c("OPENAI_API_KEY", "GROQ_API_KEY", "GENIUS_API_TOKEN",
-                   "ANTHROPIC_API_KEY", "GEMINI_API_KEY", "MISTRAL_API_KEY")
+                   "ANTHROPIC_API_KEY", "GEMINI_API_KEY")
 missing_keys <- required_keys[!nchar(Sys.getenv(required_keys)) > 0]
 
 if (length(missing_keys) > 0) {

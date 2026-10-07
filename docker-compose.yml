@@ -13,9 +13,10 @@ services:
       # Mount a separate volume for renv library to avoid permission issues
       - renv-lib:/project/renv/library
 
-    # Load environment variables from .Renviron file
+    # Load API keys from .Renviron if present (only the full live run needs them)
     env_file:
-      - .Renviron
+      - path: .Renviron
+        required: false  # not needed for run_frozen.R or run_public.R (Compose >= 2.24)
 
     # Keep container running for interactive use
     # Comment out 'command' if you want to run the pipeline automatically
@@ -55,7 +56,8 @@ services:
       - renv-lib:/home/rstudio/project/renv/library
 
     env_file:
-      - .Renviron
+      - path: .Renviron
+        required: false  # not needed for run_frozen.R or run_public.R (Compose >= 2.24)
 
     environment:
       - DISABLE_AUTH=true  # For local development only!
