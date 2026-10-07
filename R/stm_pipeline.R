@@ -23,14 +23,16 @@ stm_pipeline <- list(
     description = "STM: filtered lyrics and metadata for topic modeling"
   ),
   # ---- Text processing
-  tar_target(
+  # Frozen in frozen mode: tokenization of a few lyrics written in Unicode styled letters differs across
+  # platforms, and the STM is sensitive to the resulting vocabulary differences.
+  tar_frozen(tar_target(
     name = stm_processed,
     command = stm::textProcessor(
       hot100_genius_full_stm_data$Lyrics,
       metadata = hot100_genius_full_stm_data
     ),
     description = "STM: processed documents and metadata"
-  ),
+  )),
   tar_target(
     name = stm_prepped,
     command = stm::prepDocuments(

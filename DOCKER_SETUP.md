@@ -104,6 +104,14 @@ If API calls fail, check that variables from `.Renviron` are visible inside the 
 docker compose exec lyrics-pipeline Rscript -e "nzchar(Sys.getenv('OPENAI_API_KEY'))"  # TRUE if set; does not print the key
 ```
 
+If a package is missing inside `docker compose` runs but present in the image (for example after `renv.lock`
+changed and the image was rebuilt), the named `renv-lib` volume is stale: Docker fills it from the image only when it
+is first created. Remove it so the next run repopulates it from the current image:
+
+```bash
+docker compose down -v
+```
+
 To inspect Docker disk use:
 
 ```bash
@@ -121,3 +129,6 @@ docker compose run --rm lyrics-pipeline Rscript run_frozen.R   # requires data-f
 ```
 
 The frozen run writes to `_targets_frozen/`, which persists in the mounted project directory.
+
+The image sets `OPENBLAS_NUM_THREADS=1`: with multithreaded OpenBLAS the STM fit runs several times slower. The STM
+converges to a very similar but not bit-identical solution on Linux; see the numerical note in `README.md`.

@@ -37,6 +37,16 @@ tar_load(clear_politics_songs)
 tar_load(politics_simple_prompts_full_raw)
 source(here::here("R", "frozen_targets.R"))
 meta <- pipeline_meta()
+# Processing time of a branched target, summed across its branches (the pattern row only records the last run)
+target_duration <- function(target) {
+  meta |>
+    dplyr::filter(parent %in% target) |>
+    dplyr::summarise(seconds = sum(seconds, na.rm = TRUE)) |>
+    dplyr::pull(seconds) |>
+    round() |>
+    lubridate::as.duration() |>
+    format()
+}
 
 known_politics <- readr::read_csv(
   here::here("data-raw", "known_politics_songs.csv"),
@@ -117,7 +127,7 @@ theme_set(theme_bw())
 
 The basic data consists of the lyrics to the Billboard Hot 100 songs. The list of Billboard Hot 100 songs was obtained from Kaggle, which scrapes them weekly from the billboard website; this is hosted at <https://www.kaggle.com/datasets/ludmin/billboard?resource=download&select=hot100.csv>.
 
-We scraped the lyrics to the Hot 100 songs from `r min(hot100data$date)` to `r max(hot100data$date)`. The scraper finds the best match in the Genius dataset by string distance to the song and artist. Scraping takes approximately `r meta |> filter(name == "hot100_genius_full") |> pull(seconds) |> round() |> lubridate::as.duration() |> print()`, though with some starts and stops.
+We scraped the lyrics to the Hot 100 songs from `r min(hot100data$date)` to `r max(hot100data$date)`. The scraper finds the best match in the Genius dataset by string distance to the song and artist. Scraping took approximately `r target_duration("hot100_genius_full")` of processing time summed across batches, though with some starts and stops.
 
 Not every song in the Hot 100 dataset has matching lyrics, and the song-artist combination is not always a perfect match. We set a threshold of 0.5 for matching song and artist combinations (anything above is unmatched), though in practice we used a match distance below 0.3 for our analyses. @fig-match-by-match-score and @fig-match-proportions-by-match-score summarize the distribution of match scores (including unmatched songs, shown as NA); approximately `r hot100_genius_full |> ungroup() |> summarise(matched = sum(!is.na(match_score)), prop = sum(matched/n())) |> pull(prop) |> round(2)` of all songs were matched to lyrics. Most very recent songs have matching lyrics, as do late 1980s-early 1990s songs, though the matches are less precise in the 2000s. @tbl-example-of-match-discrepancies provides examples of imperfect matching; usually these are real matches input slightly differently in the Genius database by users. Our use of a match score below 0.3 is conservative.
 
@@ -183,7 +193,7 @@ models_df |>
 
 We constructed a [prompt](prompts/politics-simple-prompt.md) that provided the LLM with the lyrics to the song and asked it to determine whether the song was "about politics", but did not further specify what "politics" meant. The prompt returned a response that included a single yes/no answer to the question of whether the lyrics of a given song were "about politics", a brief justification for the answer, and a confidence score between 0 and 1, wrapped in a JSON structure. All prompts used are included in the appendix. 
 
-Processing this entire set of lyrics through one language model consumes about `r politics_simple_costs |> dplyr::summarise(prompt_tokens = mean(input_tokens, na.rm = TRUE)) |> dplyr::pull(prompt_tokens) |> scales::label_number()()` prompt tokens and about `r politics_simple_costs |> dplyr::summarise(completion_tokens = mean(output_tokens, na.rm = TRUE)) |> dplyr::pull(completion_tokens) |> scales::label_number()()` completion tokens on average across models. This took `r meta |> dplyr::filter(name == "combined_responses_politics_simple") |> dplyr::summarise(seconds = sum(seconds, na.rm = TRUE)) |> dplyr::pull(seconds) |> lubridate::as.duration()` of wall time, though given that many targets were processed using batch mode this can be misleading (batches can take up to 24 hours to process, but sometimes complete much faster). 
+Processing this entire set of lyrics through one language model consumes about `r politics_simple_costs |> dplyr::summarise(prompt_tokens = mean(input_tokens, na.rm = TRUE)) |> dplyr::pull(prompt_tokens) |> scales::label_number()()` prompt tokens and about `r politics_simple_costs |> dplyr::summarise(completion_tokens = mean(output_tokens, na.rm = TRUE)) |> dplyr::pull(completion_tokens) |> scales::label_number()()` completion tokens on average across models. This took `r target_duration("combined_responses_politics_simple")` of processing time summed across batches, though given that many targets were processed using batch mode this can be misleading (batches can take up to 24 hours to process, but sometimes complete much faster). 
 
 ```{r}
 #| label: tbl-politics-simple-costs
@@ -203,7 +213,7 @@ politics_categories |>
   knitr::kable()
 ```
 
-Extracting themes through one language model consumes about `r politics_themes_cost |> dplyr::summarise(prompt_tokens = mean(input_tokens, na.rm = TRUE)) |> dplyr::pull(prompt_tokens) |> scales::label_number()()` prompt tokens and about `r politics_themes_cost |> dplyr::summarise(completion_tokens = mean(output_tokens, na.rm = TRUE)) |> dplyr::pull(completion_tokens) |> scales::label_number()()` completion tokens on average across models. This took `r meta |> dplyr::filter(name == "combined_responses_politics_themes") |> dplyr::summarise(seconds = sum(seconds, na.rm = TRUE)) |> dplyr::pull(seconds) |> lubridate::as.duration()` of wall time, though again this can be misleading. 
+Extracting themes through one language model consumes about `r politics_themes_cost |> dplyr::summarise(prompt_tokens = mean(input_tokens, na.rm = TRUE)) |> dplyr::pull(prompt_tokens) |> scales::label_number()()` prompt tokens and about `r politics_themes_cost |> dplyr::summarise(completion_tokens = mean(output_tokens, na.rm = TRUE)) |> dplyr::pull(completion_tokens) |> scales::label_number()()` completion tokens on average across models. This took `r target_duration("combined_responses_politics_themes")` of processing time summed across batches, though again this can be misleading. 
 
 ## Model Correlations
 

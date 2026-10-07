@@ -48,6 +48,9 @@ RUN python3 -m venv /opt/empath_venv \
 # Point reticulate at the Empath venv by default
 ENV RETICULATE_PYTHON=/opt/empath_venv/bin/python
 
+# Multithreaded OpenBLAS thrashes on stm's many small matrix operations (the STM fit runs over 6x slower)
+ENV OPENBLAS_NUM_THREADS=1
+
 # Copy the rest of the project files
 COPY . /project
 

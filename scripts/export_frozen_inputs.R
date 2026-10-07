@@ -35,7 +35,7 @@ manifest <- purrr::map(FROZEN_TARGETS, \(name) {
     rows = if (is.data.frame(object)) nrow(object) else NA_integer_,
     bytes = file.size(path),
     md5 = unname(tools::md5sum(path)),
-    contains_full_lyrics = name %in% c("hot100_genius_sample", "hot100_genius_full")
+    contains_full_lyrics = name %in% c("hot100_genius_sample", "hot100_genius_full", "stm_processed")
   )
 }) |>
   purrr::list_rbind()

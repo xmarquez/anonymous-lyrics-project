@@ -1,7 +1,8 @@
 # Frozen-input mode
 #
-# Targets that scrape Genius, call paid LLM APIs, or run the multi-hour STM search
-# can be replaced by "frozen" copies of their outputs from the authors' original run.
+# Targets that scrape Genius, call paid LLM APIs, or run the multi-hour STM search, and the STM text preprocessing
+# (whose tokenization differs across platforms), can be replaced by "frozen" copies of their outputs from the
+# authors' original run.
 # Frozen mode is active when the targets project is "frozen" (see _targets.yaml), e.g.
 #   Sys.setenv(TAR_PROJECT = "frozen"); targets::tar_make()
 # The frozen run uses its own store (_targets_frozen/) and reads inputs from data-frozen/,
@@ -19,6 +20,7 @@ FROZEN_TARGETS <- c(
   "politics_categories_human",
   "politics_themes_responses_sample",
   "combined_responses_politics_themes",
+  "stm_processed",
   "stm_search_k"
 )
 

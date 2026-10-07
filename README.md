@@ -181,6 +181,8 @@ Rscript run_frozen.R
 
 This rebuilds every target downstream of scraping and LLM calls into `_targets_frozen/` and renders the three reports. No API keys are needed.
 
+**Numerical note on the STM.** The structural topic model is sensitive to floating-point differences between platforms and linear-algebra libraries. On the authors' platform (Windows, R's bundled reference BLAS) the frozen run reproduces the published topics exactly; on Linux, including the Docker image, it converges to a very similar but not identical solution (matched topics have a median correlation of 0.96-0.98, but a few topics differ), so the STM topic table and the violence-topic figure can differ slightly. All other results reproduce exactly across platforms.
+
 ## Optional Full Live Pipeline
 
 1. Copy `.Renviron.example` to `.Renviron`.
